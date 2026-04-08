@@ -271,3 +271,95 @@ func TestEvaluationReportRepository_FailureReasons(t *testing.T) {
 		t.Errorf("expected 2 failure reasons, got %d", len(reports[0].FailureReasons))
 	}
 }
+
+func TestImprovementMemoryRepository_SaveAndFind(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewImprovementMemoryRepository(tdb.DB)
+
+	entry := &domain.ImprovementMemoryEntry{
+		MemoryId:           "MEM001",
+		PatternKey:         "test_failure",
+		PatternDescription: "test_failure",
+		SuccessCount:       3,
+		FailureCount:       1,
+		LastObservedAt:     time.Now().Truncate(time.Second),
+	}
+
+	if err := repo.Save(entry); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+
+	found, err := repo.FindByPatternKey("test_failure")
+	if err != nil {
+		t.Fatalf("failed to find: %v", err)
+	}
+	if found.SuccessCount != 3 {
+		t.Errorf("expected SuccessCount 3, got %d", found.SuccessCount)
+	}
+	if found.FailureCount != 1 {
+		t.Errorf("expected FailureCount 1, got %d", found.FailureCount)
+	}
+}
+
+func TestImprovementMemoryRepository_RecordSuccessAndFailure(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewImprovementMemoryRepository(tdb.DB)
+
+	entry := &domain.ImprovementMemoryEntry{
+		MemoryId:           "MEM002",
+		PatternKey:         "lint_violation",
+		PatternDescription: "lint_violation",
+		SuccessCount:       0,
+		FailureCount:       0,
+		LastObservedAt:     time.Now(),
+	}
+	if err := repo.Save(entry); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+
+	if err := repo.RecordSuccess("lint_violation"); err != nil {
+		t.Fatalf("failed to record success: %v", err)
+	}
+	if err := repo.RecordSuccess("lint_violation"); err != nil {
+		t.Fatalf("failed to record success: %v", err)
+	}
+	if err := repo.RecordFailure("lint_violation"); err != nil {
+		t.Fatalf("failed to record failure: %v", err)
+	}
+
+	found, err := repo.FindByPatternKey("lint_violation")
+	if err != nil {
+		t.Fatalf("failed to find: %v", err)
+	}
+	if found.SuccessCount != 2 {
+		t.Errorf("expected SuccessCount 2, got %d", found.SuccessCount)
+	}
+	if found.FailureCount != 1 {
+		t.Errorf("expected FailureCount 1, got %d", found.FailureCount)
+	}
+}
+
+func TestImprovementMemoryRepository_FindAll(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewImprovementMemoryRepository(tdb.DB)
+
+	for _, key := range []string{"test_failure", "lint_violation"} {
+		entry := &domain.ImprovementMemoryEntry{
+			MemoryId:           "MEM_" + key,
+			PatternKey:         key,
+			PatternDescription: key,
+			LastObservedAt:     time.Now(),
+		}
+		if err := repo.Save(entry); err != nil {
+			t.Fatalf("failed to save: %v", err)
+		}
+	}
+
+	entries, err := repo.FindAll()
+	if err != nil {
+		t.Fatalf("failed to find all: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Errorf("expected 2 entries, got %d", len(entries))
+	}
+}

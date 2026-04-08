@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/kiwamoto1987/evoloop/internal/policy"
 	"gopkg.in/yaml.v3"
 )
 
@@ -51,6 +52,21 @@ func Load(projectRoot string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// ToExecutionPolicy converts config policies to an ExecutionPolicy.
+func (c *Config) ToExecutionPolicy() *policy.ExecutionPolicy {
+	p := policy.DefaultPolicy()
+	if c.Policies.MaxChangedFiles > 0 {
+		p.MaxFiles = c.Policies.MaxChangedFiles
+	}
+	if c.Policies.MaxChangedLines > 0 {
+		p.MaxLines = c.Policies.MaxChangedLines
+	}
+	if len(c.Policies.DenyPaths) > 0 {
+		p.DenyPaths = c.Policies.DenyPaths
+	}
+	return p
 }
 
 // RuntimePath returns the path to the runtime directory.
