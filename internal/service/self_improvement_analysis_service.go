@@ -25,7 +25,9 @@ func NewSelfImprovementAnalysisService(memoryRepo *repository.ImprovementMemoryR
 func (s *SelfImprovementAnalysisService) Analyze(snapshot *domain.QualityMetricSnapshot) []*domain.ImplementationIssue {
 	var issues []*domain.ImplementationIssue
 
-	if !snapshot.TestSucceeded {
+	if snapshot.TestToolMissing {
+		issues = append(issues, s.newEnvironmentIssue("Test tool not found", snapshot.TestOutput))
+	} else if !snapshot.TestSucceeded {
 		issues = append(issues, &domain.ImplementationIssue{
 			IssueId:          generateID(),
 			IssueTitle:       "Fix test failures",
@@ -41,7 +43,9 @@ func (s *SelfImprovementAnalysisService) Analyze(snapshot *domain.QualityMetricS
 		})
 	}
 
-	if !snapshot.LintSucceeded {
+	if snapshot.LintToolMissing {
+		issues = append(issues, s.newEnvironmentIssue("Lint tool not found", snapshot.LintOutput))
+	} else if !snapshot.LintSucceeded {
 		issues = append(issues, &domain.ImplementationIssue{
 			IssueId:          generateID(),
 			IssueTitle:       "Fix lint violations",
@@ -57,7 +61,9 @@ func (s *SelfImprovementAnalysisService) Analyze(snapshot *domain.QualityMetricS
 		})
 	}
 
-	if !snapshot.TypeCheckSucceeded {
+	if snapshot.TypeCheckToolMissing {
+		issues = append(issues, s.newEnvironmentIssue("TypeCheck tool not found", snapshot.TypeCheckOutput))
+	} else if !snapshot.TypeCheckSucceeded {
 		issues = append(issues, &domain.ImplementationIssue{
 			IssueId:          generateID(),
 			IssueTitle:       "Fix type check errors",
@@ -108,6 +114,21 @@ func (s *SelfImprovementAnalysisService) adjustPriorities(issues []*domain.Imple
 				issue.IssuePriority--
 			}
 		}
+	}
+}
+
+func (s *SelfImprovementAnalysisService) newEnvironmentIssue(title, output string) *domain.ImplementationIssue {
+	return &domain.ImplementationIssue{
+		IssueId:          generateID(),
+		IssueTitle:       title,
+		IssueDescription: output,
+		IssueCategory:    domain.IssueCategoryEnvironment,
+		IssuePriority:    0,
+		IssueStatus:      domain.IssueStatusOpen,
+		AcceptanceCriteria: []string{
+			"Install the required tool",
+		},
+		CreatedAt: time.Now(),
 	}
 }
 

@@ -15,7 +15,13 @@ const (
 	IssueCategoryTestFailure      = "test_failure"
 	IssueCategoryLintViolation    = "lint_violation"
 	IssueCategoryTypeCheckFailure = "typecheck_failure"
+	IssueCategoryEnvironment      = "environment"
 )
+
+// IsProposable returns true if the issue can be addressed by LLM patch generation.
+func (i *ImplementationIssue) IsProposable() bool {
+	return i.IssueCategory != IssueCategoryEnvironment
+}
 
 // ImplementationIssue represents a self-improvement issue detected by analysis.
 type ImplementationIssue struct {

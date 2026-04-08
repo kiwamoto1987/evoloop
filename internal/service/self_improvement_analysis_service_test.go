@@ -122,6 +122,52 @@ func TestAnalyze_MultipleFailures(t *testing.T) {
 	}
 }
 
+func TestAnalyze_ToolMissing_EnvironmentIssue(t *testing.T) {
+	snapshot := &domain.QualityMetricSnapshot{
+		TestSucceeded:      true,
+		LintSucceeded:      false,
+		LintToolMissing:    true,
+		LintOutput:         "tool not found: golangci-lint",
+		TypeCheckSucceeded: true,
+	}
+
+	analyzer := service.NewSelfImprovementAnalysisService(nil)
+	issues := analyzer.Analyze(snapshot)
+
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d", len(issues))
+	}
+	if issues[0].IssueCategory != domain.IssueCategoryEnvironment {
+		t.Errorf("expected category %q, got %q", domain.IssueCategoryEnvironment, issues[0].IssueCategory)
+	}
+	if issues[0].IsProposable() {
+		t.Error("environment issue should not be proposable")
+	}
+}
+
+func TestAnalyze_ToolExists_QualityIssue(t *testing.T) {
+	snapshot := &domain.QualityMetricSnapshot{
+		TestSucceeded:      false,
+		TestToolMissing:    false,
+		TestOutput:         "FAIL: TestSomething",
+		LintSucceeded:      true,
+		TypeCheckSucceeded: true,
+	}
+
+	analyzer := service.NewSelfImprovementAnalysisService(nil)
+	issues := analyzer.Analyze(snapshot)
+
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d", len(issues))
+	}
+	if issues[0].IssueCategory != domain.IssueCategoryTestFailure {
+		t.Errorf("expected category %q, got %q", domain.IssueCategoryTestFailure, issues[0].IssueCategory)
+	}
+	if !issues[0].IsProposable() {
+		t.Error("code quality issue should be proposable")
+	}
+}
+
 func TestAnalyze_PriorityBoostFromMemory(t *testing.T) {
 	tdb, err := repository.OpenTestDatabase()
 	if err != nil {

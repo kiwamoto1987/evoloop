@@ -80,3 +80,30 @@ func TestCollect_NoCommandsConfigured(t *testing.T) {
 		t.Error("expected TypeCheckSucceeded to be true when no command configured")
 	}
 }
+
+func TestCollect_ToolNotFound(t *testing.T) {
+	dir := t.TempDir()
+
+	ctx := &domain.ProjectContext{
+		ProjectRootPath:  dir,
+		TestCommand:      "true",
+		LintCommand:      "nonexistent-tool-xyz run",
+		TypeCheckCommand: "true",
+	}
+
+	collector := service.NewQualityMetricCollector()
+	snapshot := collector.Collect(ctx)
+
+	if !snapshot.LintToolMissing {
+		t.Error("expected LintToolMissing to be true")
+	}
+	if snapshot.LintSucceeded {
+		t.Error("expected LintSucceeded to be false when tool is missing")
+	}
+	if !snapshot.TestSucceeded {
+		t.Error("expected TestSucceeded to be true")
+	}
+	if snapshot.TestToolMissing {
+		t.Error("expected TestToolMissing to be false")
+	}
+}

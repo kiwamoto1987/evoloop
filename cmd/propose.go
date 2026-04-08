@@ -42,6 +42,10 @@ var proposeCmd = &cobra.Command{
 			return fmt.Errorf("issue not found: %w", err)
 		}
 
+		if !issue.IsProposable() {
+			return fmt.Errorf("issue %s is an environment issue and cannot be addressed by LLM", issue.IssueId)
+		}
+
 		// Load config for LLM settings
 		cfg, err := config.Load(path)
 		if err != nil {
