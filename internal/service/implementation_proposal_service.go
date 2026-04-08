@@ -49,6 +49,12 @@ func (s *ImplementationProposalService) Propose(issue *domain.ImplementationIssu
 		TargetPaths:        issue.TargetPaths,
 	}
 
+	// Extract and read relevant files from issue description (error output)
+	filePaths := ExtractFilePaths(issue.IssueDescription, projectRoot)
+	if len(filePaths) > 0 {
+		promptCtx.RelevantFileContents = ReadRelevantFiles(filePaths, projectRoot)
+	}
+
 	// Save prompt artifact
 	promptPath, err := s.saveArtifact("prompts", executionId+".txt", buildPromptText(promptCtx))
 	if err != nil {
