@@ -129,6 +129,51 @@ func TestExecutionHistoryRepository_SaveAndFindAll(t *testing.T) {
 	}
 }
 
+func TestExecutionHistoryRepository_FindByID(t *testing.T) {
+	tdb := setupTestDB(t)
+	issueRepo := repository.NewImplementationIssueRepository(tdb.DB)
+	execRepo := repository.NewExecutionHistoryRepository(tdb.DB)
+
+	issue := &domain.ImplementationIssue{
+		IssueId: "ISSUE001", IssueTitle: "t", IssueDescription: "d",
+		IssueCategory: "test_failure", IssuePriority: 1, IssueStatus: "Open",
+		CreatedAt: time.Now(),
+	}
+	if err := issueRepo.Save(issue); err != nil {
+		t.Fatalf("failed to save issue: %v", err)
+	}
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC001", IssueId: "ISSUE001",
+		ExecutionStatus: "Completed", ModelProvider: "claude", ModelName: "sonnet",
+		StartedAt: time.Now().Truncate(time.Second), FinishedAt: time.Now().Truncate(time.Second),
+	}
+	if err := execRepo.Save(record); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+
+	found, err := execRepo.FindByID("EXEC001")
+	if err != nil {
+		t.Fatalf("failed to find: %v", err)
+	}
+	if found.ExecutionStatus != "Completed" {
+		t.Errorf("expected Completed, got %q", found.ExecutionStatus)
+	}
+	if found.ModelProvider != "claude" {
+		t.Errorf("expected claude, got %q", found.ModelProvider)
+	}
+}
+
+func TestExecutionHistoryRepository_FindByID_NotFound(t *testing.T) {
+	tdb := setupTestDB(t)
+	execRepo := repository.NewExecutionHistoryRepository(tdb.DB)
+
+	_, err := execRepo.FindByID("NONEXISTENT")
+	if err == nil {
+		t.Fatal("expected error for non-existent ID")
+	}
+}
+
 func TestEvaluationReportRepository_SaveAndFindAll(t *testing.T) {
 	tdb := setupTestDB(t)
 	issueRepo := repository.NewImplementationIssueRepository(tdb.DB)

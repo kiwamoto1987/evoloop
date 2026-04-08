@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kiwamoto1987/evoloop/internal/config"
+	"github.com/kiwamoto1987/evoloop/internal/repository"
 	"github.com/kiwamoto1987/evoloop/internal/service"
 	"github.com/spf13/cobra"
 )
@@ -35,12 +37,27 @@ var analyzeCmd = &cobra.Command{
 			return nil
 		}
 
+		// Save issues to DB
+		db, err := repository.OpenDatabase(config.DatabasePath(path))
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		issueRepo := repository.NewImplementationIssueRepository(db)
+		for _, issue := range issues {
+			if err := issueRepo.Save(issue); err != nil {
+				return fmt.Errorf("failed to save issue: %w", err)
+			}
+		}
+
 		out, err := json.MarshalIndent(issues, "", "  ")
 		if err != nil {
 			return fmt.Errorf("failed to marshal issues: %w", err)
 		}
 
 		fmt.Println(string(out))
+		fmt.Printf("\n%d issue(s) saved to database.\n", len(issues))
 		return nil
 	},
 }
