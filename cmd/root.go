@@ -13,3 +13,10 @@ var rootCmd = &cobra.Command{
 func Execute() error {
 	return rootCmd.Execute()
 }
+
+// ExecuteArgs runs the root command with the given arguments. Exported for testing.
+func ExecuteArgs(args []string) error {
+	rootCmd.SetArgs(args)
+	defer rootCmd.SetArgs(nil)
+	return rootCmd.Execute()
+}
