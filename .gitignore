@@ -1,0 +1,25 @@
+# Binaries
+evoloop
+*.exe
+
+# Go
+vendor/
+
+# Evoloop runtime data
+.evoloop/runtime/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Internal docs
+docs/
+
+# Claude Code local config
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
