@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/kiwamoto1987/evoloop/internal/config"
 	"github.com/kiwamoto1987/evoloop/internal/domain"
@@ -16,6 +18,7 @@ import (
 var (
 	runMaxIterations int
 	runMaxFailures   int
+	runAutoApply     bool
 )
 
 var runCmd = &cobra.Command{
@@ -140,7 +143,15 @@ var runCmd = &cobra.Command{
 				selected.IssueStatus = domain.IssueStatusAccepted
 				_ = memoryRepo.RecordSuccess(selected.IssueCategory)
 				consecutiveFailures = 0
-				fmt.Println("[evaluate] ✓ Accepted")
+				fmt.Println("[evaluate] Accepted")
+
+				if runAutoApply {
+					if err := applyPatchToProject(path, record.PatchPath); err != nil {
+						fmt.Printf("[apply] Failed to apply patch: %v\n", err)
+					} else {
+						fmt.Printf("[apply] Patch applied to project\n")
+					}
+				}
 			} else {
 				selected.IssueStatus = domain.IssueStatusRejected
 				_ = memoryRepo.RecordFailure(selected.IssueCategory)
@@ -177,8 +188,25 @@ func selectBestIssue(issues []*domain.ImplementationIssue) *domain.Implementatio
 	return best
 }
 
+func applyPatchToProject(projectDir, patchPath string) error {
+	patchData, err := os.ReadFile(patchPath)
+	if err != nil {
+		return fmt.Errorf("failed to read patch: %w", err)
+	}
+
+	cmd := exec.Command("patch", "-p1")
+	cmd.Dir = projectDir
+	cmd.Stdin = strings.NewReader(string(patchData))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("patch command failed: %w\noutput: %s", err, string(out))
+	}
+	return nil
+}
+
 func init() {
 	runCmd.Flags().IntVar(&runMaxIterations, "max-iterations", 1, "maximum number of improvement iterations")
 	runCmd.Flags().IntVar(&runMaxFailures, "max-failures", 3, "stop after this many consecutive failures")
+	runCmd.Flags().BoolVar(&runAutoApply, "auto-apply", false, "automatically apply accepted patches to the project")
 	rootCmd.AddCommand(runCmd)
 }
