@@ -88,9 +88,6 @@ func TestEvaluate_RejectedByTestFailure(t *testing.T) {
 	if report.EvaluationDecision != domain.EvaluationDecisionRejected {
 		t.Errorf("expected Rejected, got %q", report.EvaluationDecision)
 	}
-	if !report.TestPassed == true {
-		// TestPassed should be false
-	}
 	if report.TestPassed {
 		t.Error("expected TestPassed to be false")
 	}
