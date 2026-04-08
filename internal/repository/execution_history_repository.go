@@ -30,6 +30,26 @@ func (r *ExecutionHistoryRepository) Save(record *domain.ExecutionRecord) error 
 	return err
 }
 
+// FindByID retrieves an execution record by ID.
+func (r *ExecutionHistoryRepository) FindByID(id string) (*domain.ExecutionRecord, error) {
+	row := r.db.QueryRow(
+		`SELECT execution_id, issue_id, execution_status, model_provider, model_name, prompt_path, patch_path, started_at, finished_at
+		FROM execution_records WHERE execution_id = ?`, id,
+	)
+
+	record := &domain.ExecutionRecord{}
+	err := row.Scan(
+		&record.ExecutionId, &record.IssueId, &record.ExecutionStatus,
+		&record.ModelProvider, &record.ModelName,
+		&record.PromptPath, &record.PatchPath,
+		&record.StartedAt, &record.FinishedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
 // FindAll retrieves all execution records.
 func (r *ExecutionHistoryRepository) FindAll() ([]*domain.ExecutionRecord, error) {
 	rows, err := r.db.Query(

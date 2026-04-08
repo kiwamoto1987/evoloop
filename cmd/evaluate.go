@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kiwamoto1987/evoloop/internal/config"
 	"github.com/kiwamoto1987/evoloop/internal/domain"
 	"github.com/kiwamoto1987/evoloop/internal/policy"
+	"github.com/kiwamoto1987/evoloop/internal/repository"
 	"github.com/kiwamoto1987/evoloop/internal/service"
 	"github.com/spf13/cobra"
 )
@@ -33,15 +35,45 @@ var evaluateCmd = &cobra.Command{
 			return fmt.Errorf("inspect failed: %w", err)
 		}
 
-		// TODO: load execution record from DB once persistence is implemented
-		record := &domain.ExecutionRecord{
-			ExecutionId: evaluateExecutionId,
+		// Open DB
+		db, err := repository.OpenDatabase(config.DatabasePath(path))
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		// Load execution record from DB
+		execRepo := repository.NewExecutionHistoryRepository(db)
+		record, err := execRepo.FindByID(evaluateExecutionId)
+		if err != nil {
+			return fmt.Errorf("execution record not found: %w", err)
 		}
 
+		// Run evaluation
 		svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
 		report, err := svc.Evaluate(record, projectCtx)
 		if err != nil {
 			return err
+		}
+
+		// Save evaluation report to DB
+		evalRepo := repository.NewEvaluationReportRepository(db)
+		if err := evalRepo.Save(report); err != nil {
+			return fmt.Errorf("failed to save evaluation report: %w", err)
+		}
+
+		// Update issue status based on evaluation decision
+		issueRepo := repository.NewImplementationIssueRepository(db)
+		issue, err := issueRepo.FindByID(record.IssueId)
+		if err == nil {
+			if report.EvaluationDecision == domain.EvaluationDecisionAccepted {
+				issue.IssueStatus = domain.IssueStatusAccepted
+			} else {
+				issue.IssueStatus = domain.IssueStatusRejected
+			}
+			if err := issueRepo.Save(issue); err != nil {
+				return fmt.Errorf("failed to update issue status: %w", err)
+			}
 		}
 
 		out, err := json.MarshalIndent(report, "", "  ")

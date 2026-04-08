@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"github.com/kiwamoto1987/evoloop/internal/config"
 	"github.com/kiwamoto1987/evoloop/internal/service"
 	"github.com/spf13/cobra"
 )
@@ -36,6 +38,17 @@ var inspectCmd = &cobra.Command{
 		}
 
 		fmt.Println(string(out))
+
+		// Save artifact
+		reportsDir := filepath.Join(config.RuntimePath(path), "reports")
+		if err := os.MkdirAll(reportsDir, 0755); err != nil {
+			return fmt.Errorf("failed to create reports directory: %w", err)
+		}
+		artifactPath := filepath.Join(reportsDir, "project_inspection.json")
+		if err := os.WriteFile(artifactPath, out, 0644); err != nil {
+			return fmt.Errorf("failed to save inspection report: %w", err)
+		}
+
 		return nil
 	},
 }
