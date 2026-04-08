@@ -20,6 +20,15 @@ docs/
 # Claude Code local config
 .claude/
 
+# Secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+**/secrets.yaml
+!.github/
+
 # OS
 .DS_Store
 Thumbs.db
