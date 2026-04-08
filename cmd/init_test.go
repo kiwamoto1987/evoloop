@@ -19,7 +19,7 @@ func TestInitCommand_CreatesConfig(t *testing.T) {
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(original)
+	defer func() { _ = os.Chdir(original) }()
 
 	if err := cmd.RunInit(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -50,7 +50,7 @@ func TestInitCommand_AlreadyExists(t *testing.T) {
 	if err := os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(original)
+	defer func() { _ = os.Chdir(original) }()
 
 	// First init should succeed
 	if err := cmd.RunInit(); err != nil {

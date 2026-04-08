@@ -74,10 +74,10 @@ var evaluateCmd = &cobra.Command{
 		if err == nil {
 			if report.EvaluationDecision == domain.EvaluationDecisionAccepted {
 				issue.IssueStatus = domain.IssueStatusAccepted
-				memoryRepo.RecordSuccess(issue.IssueCategory)
+				_ = memoryRepo.RecordSuccess(issue.IssueCategory)
 			} else {
 				issue.IssueStatus = domain.IssueStatusRejected
-				memoryRepo.RecordFailure(issue.IssueCategory)
+				_ = memoryRepo.RecordFailure(issue.IssueCategory)
 			}
 			if err := issueRepo.Save(issue); err != nil {
 				return fmt.Errorf("failed to update issue status: %w", err)

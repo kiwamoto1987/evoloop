@@ -85,7 +85,7 @@ func ensureMemoryEntry(repo *repository.ImprovementMemoryRepository, patternKey 
 			FailureCount:       0,
 			LastObservedAt:     time.Now(),
 		}
-		repo.Save(entry)
+		_ = repo.Save(entry)
 	}
 }
 
