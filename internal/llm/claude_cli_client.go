@@ -43,7 +43,7 @@ func (c *ClaudeCLIClient) GeneratePatch(input *domain.PromptContext) (*domain.Pa
 func buildPrompt(input *domain.PromptContext) string {
 	var b strings.Builder
 
-	b.WriteString(fmt.Sprintf("Fix the following issue in this project.\n\n"))
+	b.WriteString("Fix the following issue in this project.\n\n")
 	b.WriteString(fmt.Sprintf("Issue: %s\n", input.IssueTitle))
 	b.WriteString(fmt.Sprintf("Description: %s\n", input.IssueDescription))
 
