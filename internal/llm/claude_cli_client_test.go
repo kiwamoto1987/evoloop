@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/kiwamoto1987/evoloop/internal/domain"
@@ -82,10 +83,41 @@ func TestBuildPrompt_ContainsIssueInfo(t *testing.T) {
 	}
 }
 
-func TestAllowedTools_Empty(t *testing.T) {
+func TestAllowedTools_DefaultReadOnly(t *testing.T) {
 	client := NewClaudeCLIClient("claude")
-	if len(client.AllowedTools) != 0 {
-		t.Errorf("expected empty AllowedTools by default, got %v", client.AllowedTools)
+	if len(client.AllowedTools) != 3 {
+		t.Errorf("expected 3 default AllowedTools, got %v", client.AllowedTools)
+	}
+	for _, tool := range []string{"Read", "Glob", "Grep"} {
+		found := false
+		for _, at := range client.AllowedTools {
+			if at == tool {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("expected %q in AllowedTools", tool)
+		}
+	}
+}
+
+func TestExtractPatch_StripMarkdownFences(t *testing.T) {
+	input := "Here is the patch:\n```diff\ndiff --git a/file.go b/file.go\n--- a/file.go\n+++ b/file.go\n@@ -1 +1 @@\n-old\n+new\n```"
+	patch := extractPatch(input)
+	if contains(patch, "```") {
+		t.Error("expected markdown fences to be stripped")
+	}
+	if !contains(patch, "diff --git") {
+		t.Error("expected patch content to be preserved")
+	}
+}
+
+func TestExtractPatch_EndsWithNewline(t *testing.T) {
+	input := "diff --git a/file.go b/file.go\n--- a/file.go\n+++ b/file.go\n-old\n+new"
+	patch := extractPatch(input)
+	if !strings.HasSuffix(patch, "\n") {
+		t.Error("expected patch to end with newline")
 	}
 }
 

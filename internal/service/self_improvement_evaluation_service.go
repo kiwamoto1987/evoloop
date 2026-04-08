@@ -76,7 +76,7 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 	// Run quality checks
 	var failures []string
 
-	if projectCtx.TestCommand != "" {
+	if projectCtx.TestCommand != "" && isToolInstalled(projectCtx.TestCommand) {
 		ok, _ := runCommandInDir(tmpDir, projectCtx.TestCommand)
 		report.TestPassed = ok
 		if !ok {
@@ -86,7 +86,7 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 		report.TestPassed = true
 	}
 
-	if projectCtx.LintCommand != "" {
+	if projectCtx.LintCommand != "" && isToolInstalled(projectCtx.LintCommand) {
 		ok, _ := runCommandInDir(tmpDir, projectCtx.LintCommand)
 		report.LintPassed = ok
 		if !ok {
@@ -96,7 +96,7 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 		report.LintPassed = true
 	}
 
-	if projectCtx.TypeCheckCommand != "" {
+	if projectCtx.TypeCheckCommand != "" && isToolInstalled(projectCtx.TypeCheckCommand) {
 		ok, _ := runCommandInDir(tmpDir, projectCtx.TypeCheckCommand)
 		report.TypeCheckPassed = ok
 		if !ok {
@@ -193,6 +193,15 @@ func countChanges(patchContent string) (files, lines int) {
 		}
 	}
 	return len(fileSet), lines
+}
+
+func isToolInstalled(command string) bool {
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return false
+	}
+	_, err := exec.LookPath(parts[0])
+	return err == nil
 }
 
 func runCommandInDir(dir, command string) (bool, string) {

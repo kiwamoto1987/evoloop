@@ -99,8 +99,8 @@ func TestPropose_LLMFailure(t *testing.T) {
 	}
 
 	record, err := svc.Propose(issue, dir)
-	if err != nil {
-		t.Fatalf("unexpected error (should be nil, failure recorded in record): %v", err)
+	if err == nil {
+		t.Fatal("expected error from LLM failure")
 	}
 
 	if record.ExecutionStatus != domain.ExecutionStatusFailed {
