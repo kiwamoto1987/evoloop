@@ -47,6 +47,11 @@ internal/
 - Only propose uses LLM (Claude CLI)
 - evaluate is non-LLM (determined by test / lint / typecheck results)
 
+## Development Rules
+
+- Follow TDD: write tests first, then implement to make them pass
+- Never commit directly to master; always create a feature branch and open a pull request
+
 ## Build & Test
 
 ```bash
