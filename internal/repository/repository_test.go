@@ -141,13 +141,17 @@ func TestEvaluationReportRepository_SaveAndFindAll(t *testing.T) {
 		IssueCategory: "test_failure", IssuePriority: 1, IssueStatus: "Open",
 		CreatedAt: time.Now(),
 	}
-	issueRepo.Save(issue)
+	if err := issueRepo.Save(issue); err != nil {
+		t.Fatalf("failed to save issue: %v", err)
+	}
 
 	record := &domain.ExecutionRecord{
 		ExecutionId: "EXEC001", IssueId: "ISSUE001",
 		ExecutionStatus: "Completed", StartedAt: time.Now(), FinishedAt: time.Now(),
 	}
-	execRepo.Save(record)
+	if err := execRepo.Save(record); err != nil {
+		t.Fatalf("failed to save execution: %v", err)
+	}
 
 	report := &domain.EvaluationReport{
 		EvaluationId:       "EVAL001",
@@ -189,13 +193,17 @@ func TestEvaluationReportRepository_FailureReasons(t *testing.T) {
 		IssueCategory: "test_failure", IssuePriority: 1, IssueStatus: "Open",
 		CreatedAt: time.Now(),
 	}
-	issueRepo.Save(issue)
+	if err := issueRepo.Save(issue); err != nil {
+		t.Fatalf("failed to save issue: %v", err)
+	}
 
 	record := &domain.ExecutionRecord{
 		ExecutionId: "EXEC002", IssueId: "ISSUE002",
 		ExecutionStatus: "Completed", StartedAt: time.Now(), FinishedAt: time.Now(),
 	}
-	execRepo.Save(record)
+	if err := execRepo.Save(record); err != nil {
+		t.Fatalf("failed to save execution: %v", err)
+	}
 
 	report := &domain.EvaluationReport{
 		EvaluationId:       "EVAL002",
