@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/kiwamoto1987/evoloop/internal/domain"
 	"github.com/kiwamoto1987/evoloop/internal/policy"
 	"gopkg.in/yaml.v3"
 )
@@ -52,6 +53,19 @@ func Load(projectRoot string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// ApplyEvalCommands overrides ProjectContext commands with config values when set.
+func (c *Config) ApplyEvalCommands(ctx *domain.ProjectContext) {
+	if c.Evaluation.TestCommand != "" {
+		ctx.TestCommand = c.Evaluation.TestCommand
+	}
+	if c.Evaluation.LintCommand != "" {
+		ctx.LintCommand = c.Evaluation.LintCommand
+	}
+	if c.Evaluation.TypeCheckCommand != "" {
+		ctx.TypeCheckCommand = c.Evaluation.TypeCheckCommand
+	}
 }
 
 // ToExecutionPolicy converts config policies to an ExecutionPolicy.

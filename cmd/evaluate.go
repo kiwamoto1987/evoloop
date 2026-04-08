@@ -34,6 +34,13 @@ var evaluateCmd = &cobra.Command{
 			return fmt.Errorf("inspect failed: %w", err)
 		}
 
+		// Load config for policy and evaluation commands
+		cfg, err := config.Load(path)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		cfg.ApplyEvalCommands(projectCtx)
+
 		// Open DB
 		db, err := repository.OpenDatabase(config.DatabasePath(path))
 		if err != nil {
@@ -46,12 +53,6 @@ var evaluateCmd = &cobra.Command{
 		record, err := execRepo.FindByID(evaluateExecutionId)
 		if err != nil {
 			return fmt.Errorf("execution record not found: %w", err)
-		}
-
-		// Load config for policy settings
-		cfg, err := config.Load(path)
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
 		}
 
 		// Run evaluation
