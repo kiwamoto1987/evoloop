@@ -195,3 +195,61 @@ func TestEvaluate_CopyExcludesPatterns(t *testing.T) {
 		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
 	}
 }
+
+func TestEvaluate_SkipsMissingLintTool(t *testing.T) {
+	projectDir, patchPath := setupEvalProject(t)
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC006",
+		PatchPath:   patchPath,
+	}
+
+	projectCtx := &domain.ProjectContext{
+		ProjectRootPath:  projectDir,
+		TestCommand:      "true",
+		LintCommand:      "nonexistent-lint-tool-xyz run",
+		TypeCheckCommand: "true",
+	}
+
+	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
+	report, err := svc.Evaluate(record, projectCtx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !report.LintPassed {
+		t.Error("expected LintPassed to be true when tool is missing (skipped)")
+	}
+	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
+		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
+	}
+}
+
+func TestEvaluate_SkipsMissingTestTool(t *testing.T) {
+	projectDir, patchPath := setupEvalProject(t)
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC007",
+		PatchPath:   patchPath,
+	}
+
+	projectCtx := &domain.ProjectContext{
+		ProjectRootPath:  projectDir,
+		TestCommand:      "nonexistent-test-tool-xyz",
+		LintCommand:      "true",
+		TypeCheckCommand: "true",
+	}
+
+	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
+	report, err := svc.Evaluate(record, projectCtx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !report.TestPassed {
+		t.Error("expected TestPassed to be true when tool is missing (skipped)")
+	}
+	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
+		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
+	}
+}
