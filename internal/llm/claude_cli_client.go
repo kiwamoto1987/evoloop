@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -11,6 +12,10 @@ import (
 // ClaudeCLIClient implements LanguageModelClient using the Claude CLI.
 type ClaudeCLIClient struct {
 	Command string
+	// AllowedTools specifies tools Claude is permitted to use.
+	// Empty means no tools allowed (text generation only).
+	// Future use: set to ["Edit","Write","Bash"] to allow file editing.
+	AllowedTools []string
 }
 
 // NewClaudeCLIClient creates a new ClaudeCLIClient.
@@ -25,7 +30,21 @@ func NewClaudeCLIClient(command string) *ClaudeCLIClient {
 func (c *ClaudeCLIClient) GeneratePatch(input *domain.PromptContext) (*domain.PatchResult, error) {
 	prompt := buildPrompt(input)
 
-	cmd := exec.Command(c.Command, "-p", prompt)
+	args := []string{
+		"-p", prompt,
+		"--no-input",
+		"--output-format", "json",
+		"--max-turns", "1",
+	}
+
+	// If allowed tools are specified, pass them; otherwise no tools.
+	if len(c.AllowedTools) > 0 {
+		for _, tool := range c.AllowedTools {
+			args = append(args, "--allowedTools", tool)
+		}
+	}
+
+	cmd := exec.Command(c.Command, args...)
 	cmd.Dir = input.ProjectRootPath
 	out, err := cmd.CombinedOutput()
 	rawOutput := string(out)
@@ -34,10 +53,27 @@ func (c *ClaudeCLIClient) GeneratePatch(input *domain.PromptContext) (*domain.Pa
 		return nil, fmt.Errorf("claude CLI failed: %w\noutput: %s", err, rawOutput)
 	}
 
+	// Parse JSON output from Claude CLI
+	content := extractContentFromJSON(rawOutput)
+
 	return &domain.PatchResult{
-		PatchContent: extractPatch(rawOutput),
+		PatchContent: extractPatch(content),
 		RawOutput:    rawOutput,
 	}, nil
+}
+
+// claudeJSONResponse represents the JSON output from claude --output-format json.
+type claudeJSONResponse struct {
+	Result string `json:"result"`
+}
+
+func extractContentFromJSON(output string) string {
+	var resp claudeJSONResponse
+	if err := json.Unmarshal([]byte(output), &resp); err == nil && resp.Result != "" {
+		return resp.Result
+	}
+	// Fallback: treat output as plain text
+	return output
 }
 
 func buildPrompt(input *domain.PromptContext) string {
@@ -56,6 +92,13 @@ func buildPrompt(input *domain.PromptContext) string {
 
 	if len(input.TargetPaths) > 0 {
 		b.WriteString(fmt.Sprintf("\nTarget paths: %s\n", strings.Join(input.TargetPaths, ", ")))
+	}
+
+	if len(input.RelevantFileContents) > 0 {
+		b.WriteString("\nRelevant files:\n")
+		for path, content := range input.RelevantFileContents {
+			b.WriteString(fmt.Sprintf("\n--- %s ---\n%s\n", path, content))
+		}
 	}
 
 	b.WriteString("\nConstraints:\n")
