@@ -8,6 +8,7 @@ Evoloop inspects your project, detects quality issues, generates patch proposals
 
 ```
 evoloop init       # Set up .evoloop/ config
+evoloop run        # Run the full improvement loop automatically
 evoloop inspect    # Detect project structure and available commands
 evoloop analyze    # Run quality checks and generate improvement issues
 evoloop propose    # Generate a patch proposal for an issue using LLM
@@ -15,11 +16,24 @@ evoloop evaluate   # Evaluate a proposal against tests, lint, and policy
 evoloop history    # View execution history
 ```
 
-### Loop
+### Automated Loop
+
+`evoloop run` executes the full loop in a single command:
 
 ```
-inspect → analyze → propose → evaluate → history
+analyze → propose → evaluate → (apply)
 ```
+
+```bash
+evoloop run                              # single iteration, review only
+evoloop run --auto-apply                 # apply accepted patches automatically
+evoloop run --auto-apply --max-iterations 3  # up to 3 iterations
+evoloop run --max-failures 2             # stop after 2 consecutive failures
+```
+
+### Step-by-Step
+
+You can also run each step manually:
 
 1. **inspect** detects the Git project, branch, dirty state, and available test/lint/typecheck commands.
 2. **analyze** runs those commands and generates `ImplementationIssue` entries for any failures.
@@ -51,7 +65,10 @@ evoloop init
 # Edit config if needed
 vim .evoloop/config.yaml
 
-# Run the loop
+# Run the automated improvement loop
+evoloop run --auto-apply
+
+# Or run step by step
 evoloop inspect
 evoloop analyze
 evoloop propose --issue <ISSUE_ID>
