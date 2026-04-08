@@ -1,0 +1,43 @@
+#!/bin/sh
+# Pre-commit hook to detect potential secrets in staged files.
+# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+PATTERNS=(
+    'ANTHROPIC_API_KEY'
+    'OPENAI_API_KEY'
+    'sk-[a-zA-Z0-9]{20,}'
+    'sk-ant-[a-zA-Z0-9-]{20,}'
+    'api[_-]?key\s*[:=]\s*["\x27][a-zA-Z0-9]'
+    'password\s*[:=]\s*["\x27][^\s]'
+    'secret\s*[:=]\s*["\x27][^\s]'
+    'token\s*[:=]\s*["\x27][a-zA-Z0-9]'
+    'AWS_SECRET_ACCESS_KEY'
+    'PRIVATE.KEY'
+)
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+FOUND=0
+for pattern in "${PATTERNS[@]}"; do
+    MATCHES=$(echo "$STAGED" | xargs grep -lEi "$pattern" 2>/dev/null || true)
+    if [ -n "$MATCHES" ]; then
+        echo "ERROR: Potential secret detected matching pattern: $pattern"
+        echo "$MATCHES" | while read -r file; do
+            echo "  - $file"
+        done
+        FOUND=1
+    fi
+done
+
+if [ "$FOUND" -eq 1 ]; then
+    echo ""
+    echo "Commit blocked. Remove secrets before committing."
+    echo "To bypass (use with caution): git commit --no-verify"
+    exit 1
+fi
+
+exit 0
