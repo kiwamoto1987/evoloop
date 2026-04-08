@@ -30,6 +30,11 @@ var analyzeCmd = &cobra.Command{
 			return fmt.Errorf("inspect failed: %w", err)
 		}
 
+		// Override commands with config if available
+		if cfg, err := config.Load(path); err == nil {
+			cfg.ApplyEvalCommands(ctx)
+		}
+
 		collector := service.NewQualityMetricCollector()
 		snapshot := collector.Collect(ctx)
 

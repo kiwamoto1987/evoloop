@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/kiwamoto1987/evoloop/internal/config"
+	"github.com/kiwamoto1987/evoloop/internal/domain"
 )
 
 func TestLoad_ValidConfig(t *testing.T) {
@@ -94,6 +95,61 @@ func TestToExecutionPolicy_Defaults(t *testing.T) {
 	}
 	if p.MaxLines != 200 {
 		t.Errorf("expected default MaxLines 200, got %d", p.MaxLines)
+	}
+}
+
+func TestApplyEvalCommands_OverridesAll(t *testing.T) {
+	cfg := &config.Config{
+		Evaluation: config.EvalConfig{
+			TestCommand:      "custom-test",
+			LintCommand:      "custom-lint",
+			TypeCheckCommand: "custom-typecheck",
+		},
+	}
+
+	ctx := &domain.ProjectContext{
+		TestCommand:      "auto-detected-test",
+		LintCommand:      "auto-detected-lint",
+		TypeCheckCommand: "auto-detected-typecheck",
+	}
+
+	cfg.ApplyEvalCommands(ctx)
+
+	if ctx.TestCommand != "custom-test" {
+		t.Errorf("expected 'custom-test', got %q", ctx.TestCommand)
+	}
+	if ctx.LintCommand != "custom-lint" {
+		t.Errorf("expected 'custom-lint', got %q", ctx.LintCommand)
+	}
+	if ctx.TypeCheckCommand != "custom-typecheck" {
+		t.Errorf("expected 'custom-typecheck', got %q", ctx.TypeCheckCommand)
+	}
+}
+
+func TestApplyEvalCommands_EmptyKeepsAutoDetected(t *testing.T) {
+	cfg := &config.Config{
+		Evaluation: config.EvalConfig{
+			TestCommand: "custom-test",
+			// LintCommand and TypeCheckCommand are empty
+		},
+	}
+
+	ctx := &domain.ProjectContext{
+		TestCommand:      "auto-detected-test",
+		LintCommand:      "auto-detected-lint",
+		TypeCheckCommand: "auto-detected-typecheck",
+	}
+
+	cfg.ApplyEvalCommands(ctx)
+
+	if ctx.TestCommand != "custom-test" {
+		t.Errorf("expected 'custom-test', got %q", ctx.TestCommand)
+	}
+	if ctx.LintCommand != "auto-detected-lint" {
+		t.Errorf("expected 'auto-detected-lint' (preserved), got %q", ctx.LintCommand)
+	}
+	if ctx.TypeCheckCommand != "auto-detected-typecheck" {
+		t.Errorf("expected 'auto-detected-typecheck' (preserved), got %q", ctx.TypeCheckCommand)
 	}
 }
 
