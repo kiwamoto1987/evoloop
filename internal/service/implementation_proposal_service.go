@@ -63,7 +63,7 @@ func (s *ImplementationProposalService) Propose(issue *domain.ImplementationIssu
 	if err != nil {
 		record.ExecutionStatus = domain.ExecutionStatusFailed
 		record.FinishedAt = time.Now()
-		return record, nil
+		return record, fmt.Errorf("LLM call failed: %w", err)
 	}
 
 	// Save patch artifact

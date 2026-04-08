@@ -9,12 +9,15 @@ import (
 	"github.com/kiwamoto1987/evoloop/internal/domain"
 )
 
+// Default tools: read-only access so Claude can inspect files but not modify them.
+var defaultAllowedTools = []string{"Read", "Glob", "Grep"}
+
 // ClaudeCLIClient implements LanguageModelClient using the Claude CLI.
 type ClaudeCLIClient struct {
 	Command string
 	// AllowedTools specifies tools Claude is permitted to use.
-	// Empty means no tools allowed (text generation only).
-	// Future use: set to ["Edit","Write","Bash"] to allow file editing.
+	// Defaults to read-only tools (Read, Glob, Grep).
+	// Set to include "Edit","Write","Bash" for future tool-enabled invocations.
 	AllowedTools []string
 }
 
@@ -23,7 +26,10 @@ func NewClaudeCLIClient(command string) *ClaudeCLIClient {
 	if command == "" {
 		command = "claude"
 	}
-	return &ClaudeCLIClient{Command: command}
+	return &ClaudeCLIClient{
+		Command:      command,
+		AllowedTools: defaultAllowedTools,
+	}
 }
 
 // GeneratePatch calls the Claude CLI to generate a patch for the given context.
@@ -32,16 +38,12 @@ func (c *ClaudeCLIClient) GeneratePatch(input *domain.PromptContext) (*domain.Pa
 
 	args := []string{
 		"-p", prompt,
-		"--no-input",
 		"--output-format", "json",
-		"--max-turns", "1",
+		"--max-turns", "5",
 	}
 
-	// If allowed tools are specified, pass them; otherwise no tools.
-	if len(c.AllowedTools) > 0 {
-		for _, tool := range c.AllowedTools {
-			args = append(args, "--allowedTools", tool)
-		}
+	for _, tool := range c.AllowedTools {
+		args = append(args, "--allowedTools", tool)
 	}
 
 	cmd := exec.Command(c.Command, args...)
@@ -105,18 +107,26 @@ func buildPrompt(input *domain.PromptContext) string {
 	b.WriteString("- Keep changes minimal\n")
 	b.WriteString("- Do not add new dependencies\n")
 	b.WriteString("- Do not delete tests\n")
-	b.WriteString("- Output ONLY a unified diff patch, no explanation\n")
+	b.WriteString("- Do NOT modify any files directly\n")
+	b.WriteString("- Output ONLY a unified diff patch, no explanation, no markdown code fences\n")
 
 	return b.String()
 }
 
 func extractPatch(output string) string {
-	// Look for unified diff markers
 	lines := strings.Split(output, "\n")
 	var patchLines []string
 	inPatch := false
 
 	for _, line := range lines {
+		// Skip markdown code fences
+		if strings.HasPrefix(line, "```") {
+			if inPatch {
+				break
+			}
+			continue
+		}
+
 		if strings.HasPrefix(line, "diff ") || strings.HasPrefix(line, "--- ") {
 			inPatch = true
 		}
@@ -126,7 +136,12 @@ func extractPatch(output string) string {
 	}
 
 	if len(patchLines) > 0 {
-		return strings.Join(patchLines, "\n")
+		// Ensure patch ends with newline
+		result := strings.Join(patchLines, "\n")
+		if !strings.HasSuffix(result, "\n") {
+			result += "\n"
+		}
+		return result
 	}
 
 	// If no diff markers found, return the full output as patch content
