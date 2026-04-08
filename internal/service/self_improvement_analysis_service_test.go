@@ -2,8 +2,10 @@ package service_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/kiwamoto1987/evoloop/internal/domain"
+	"github.com/kiwamoto1987/evoloop/internal/repository"
 	"github.com/kiwamoto1987/evoloop/internal/service"
 )
 
@@ -14,7 +16,7 @@ func TestAnalyze_AllPassed(t *testing.T) {
 		TypeCheckSucceeded: true,
 	}
 
-	analyzer := service.NewSelfImprovementAnalysisService()
+	analyzer := service.NewSelfImprovementAnalysisService(nil)
 	issues := analyzer.Analyze(snapshot)
 
 	if len(issues) != 0 {
@@ -30,7 +32,7 @@ func TestAnalyze_TestFailure(t *testing.T) {
 		TypeCheckSucceeded: true,
 	}
 
-	analyzer := service.NewSelfImprovementAnalysisService()
+	analyzer := service.NewSelfImprovementAnalysisService(nil)
 	issues := analyzer.Analyze(snapshot)
 
 	if len(issues) != 1 {
@@ -60,7 +62,7 @@ func TestAnalyze_LintFailure(t *testing.T) {
 		TypeCheckSucceeded: true,
 	}
 
-	analyzer := service.NewSelfImprovementAnalysisService()
+	analyzer := service.NewSelfImprovementAnalysisService(nil)
 	issues := analyzer.Analyze(snapshot)
 
 	if len(issues) != 1 {
@@ -82,7 +84,7 @@ func TestAnalyze_TypeCheckFailure(t *testing.T) {
 		TypeCheckOutput:    "type error",
 	}
 
-	analyzer := service.NewSelfImprovementAnalysisService()
+	analyzer := service.NewSelfImprovementAnalysisService(nil)
 	issues := analyzer.Analyze(snapshot)
 
 	if len(issues) != 1 {
@@ -103,7 +105,7 @@ func TestAnalyze_MultipleFailures(t *testing.T) {
 		TypeCheckOutput:    "type fail",
 	}
 
-	analyzer := service.NewSelfImprovementAnalysisService()
+	analyzer := service.NewSelfImprovementAnalysisService(nil)
 	issues := analyzer.Analyze(snapshot)
 
 	if len(issues) != 3 {
@@ -117,5 +119,87 @@ func TestAnalyze_MultipleFailures(t *testing.T) {
 			t.Errorf("duplicate issue ID: %s", issue.IssueId)
 		}
 		ids[issue.IssueId] = true
+	}
+}
+
+func TestAnalyze_PriorityBoostFromMemory(t *testing.T) {
+	tdb, err := repository.OpenTestDatabase()
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	defer tdb.Close()
+
+	memoryRepo := repository.NewImprovementMemoryRepository(tdb.DB)
+
+	// Create a memory entry with high success rate
+	entry := &domain.ImprovementMemoryEntry{
+		MemoryId:           "MEM001",
+		PatternKey:         domain.IssueCategoryLintViolation,
+		PatternDescription: "lint_violation",
+		SuccessCount:       8,
+		FailureCount:       2,
+		LastObservedAt:     time.Now(),
+	}
+	if err := memoryRepo.Save(entry); err != nil {
+		t.Fatalf("failed to save memory: %v", err)
+	}
+
+	snapshot := &domain.QualityMetricSnapshot{
+		TestSucceeded:      true,
+		LintSucceeded:      false,
+		LintOutput:         "lint error",
+		TypeCheckSucceeded: true,
+	}
+
+	analyzer := service.NewSelfImprovementAnalysisService(memoryRepo)
+	issues := analyzer.Analyze(snapshot)
+
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d", len(issues))
+	}
+	// High success rate (80%) should boost priority from 2 to 1
+	if issues[0].IssuePriority != 1 {
+		t.Errorf("expected boosted priority 1, got %d", issues[0].IssuePriority)
+	}
+}
+
+func TestAnalyze_PriorityDeprioritizeFromMemory(t *testing.T) {
+	tdb, err := repository.OpenTestDatabase()
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	defer tdb.Close()
+
+	memoryRepo := repository.NewImprovementMemoryRepository(tdb.DB)
+
+	// Create a memory entry with high failure rate
+	entry := &domain.ImprovementMemoryEntry{
+		MemoryId:           "MEM002",
+		PatternKey:         domain.IssueCategoryTestFailure,
+		PatternDescription: "test_failure",
+		SuccessCount:       1,
+		FailureCount:       9,
+		LastObservedAt:     time.Now(),
+	}
+	if err := memoryRepo.Save(entry); err != nil {
+		t.Fatalf("failed to save memory: %v", err)
+	}
+
+	snapshot := &domain.QualityMetricSnapshot{
+		TestSucceeded:      false,
+		TestOutput:         "test fail",
+		LintSucceeded:      true,
+		TypeCheckSucceeded: true,
+	}
+
+	analyzer := service.NewSelfImprovementAnalysisService(memoryRepo)
+	issues := analyzer.Analyze(snapshot)
+
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d", len(issues))
+	}
+	// High failure rate (90%) should deprioritize from 1 to 3
+	if issues[0].IssuePriority != 3 {
+		t.Errorf("expected deprioritized priority 3, got %d", issues[0].IssuePriority)
 	}
 }

@@ -1,13 +1,17 @@
 package cmd
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/kiwamoto1987/evoloop/internal/config"
+	"github.com/kiwamoto1987/evoloop/internal/domain"
 	"github.com/kiwamoto1987/evoloop/internal/repository"
 	"github.com/kiwamoto1987/evoloop/internal/service"
+	"github.com/oklog/ulid/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +33,15 @@ var analyzeCmd = &cobra.Command{
 		collector := service.NewQualityMetricCollector()
 		snapshot := collector.Collect(ctx)
 
-		analyzer := service.NewSelfImprovementAnalysisService()
+		// Open DB for memory lookup and issue saving
+		db, err := repository.OpenDatabase(config.DatabasePath(path))
+		if err != nil {
+			return fmt.Errorf("failed to open database: %w", err)
+		}
+		defer db.Close()
+
+		memoryRepo := repository.NewImprovementMemoryRepository(db)
+		analyzer := service.NewSelfImprovementAnalysisService(memoryRepo)
 		issues := analyzer.Analyze(snapshot)
 
 		if len(issues) == 0 {
@@ -37,13 +49,12 @@ var analyzeCmd = &cobra.Command{
 			return nil
 		}
 
-		// Save issues to DB
-		db, err := repository.OpenDatabase(config.DatabasePath(path))
-		if err != nil {
-			return fmt.Errorf("failed to open database: %w", err)
+		// Ensure memory entries exist for each issue category
+		for _, issue := range issues {
+			ensureMemoryEntry(memoryRepo, issue.IssueCategory)
 		}
-		defer db.Close()
 
+		// Save issues to DB
 		issueRepo := repository.NewImplementationIssueRepository(db)
 		for _, issue := range issues {
 			if err := issueRepo.Save(issue); err != nil {
@@ -60,6 +71,22 @@ var analyzeCmd = &cobra.Command{
 		fmt.Printf("\n%d issue(s) saved to database.\n", len(issues))
 		return nil
 	},
+}
+
+func ensureMemoryEntry(repo *repository.ImprovementMemoryRepository, patternKey string) {
+	_, err := repo.FindByPatternKey(patternKey)
+	if err != nil {
+		// Entry doesn't exist, create it
+		entry := &domain.ImprovementMemoryEntry{
+			MemoryId:           ulid.MustNew(ulid.Now(), rand.Reader).String(),
+			PatternKey:         patternKey,
+			PatternDescription: patternKey,
+			SuccessCount:       0,
+			FailureCount:       0,
+			LastObservedAt:     time.Now(),
+		}
+		repo.Save(entry)
+	}
 }
 
 func init() {

@@ -42,9 +42,15 @@ var proposeCmd = &cobra.Command{
 			return fmt.Errorf("issue not found: %w", err)
 		}
 
+		// Load config for LLM settings
+		cfg, err := config.Load(path)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
 		// Run proposal
 		artifactsPath := config.RuntimePath(path)
-		client := llm.NewClaudeCLIClient("claude")
+		client := llm.NewClaudeCLIClient(cfg.LLM.Command)
 		svc := service.NewImplementationProposalService(client, artifactsPath)
 
 		record, err := svc.Propose(issue, path)

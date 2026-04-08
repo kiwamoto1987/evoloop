@@ -7,7 +7,6 @@ import (
 
 	"github.com/kiwamoto1987/evoloop/internal/config"
 	"github.com/kiwamoto1987/evoloop/internal/domain"
-	"github.com/kiwamoto1987/evoloop/internal/policy"
 	"github.com/kiwamoto1987/evoloop/internal/repository"
 	"github.com/kiwamoto1987/evoloop/internal/service"
 	"github.com/spf13/cobra"
@@ -49,8 +48,14 @@ var evaluateCmd = &cobra.Command{
 			return fmt.Errorf("execution record not found: %w", err)
 		}
 
+		// Load config for policy settings
+		cfg, err := config.Load(path)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
 		// Run evaluation
-		svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
+		svc := service.NewSelfImprovementEvaluationService(cfg.ToExecutionPolicy())
 		report, err := svc.Evaluate(record, projectCtx)
 		if err != nil {
 			return err
@@ -62,14 +67,17 @@ var evaluateCmd = &cobra.Command{
 			return fmt.Errorf("failed to save evaluation report: %w", err)
 		}
 
-		// Update issue status based on evaluation decision
+		// Update issue status and improvement memory
 		issueRepo := repository.NewImplementationIssueRepository(db)
+		memoryRepo := repository.NewImprovementMemoryRepository(db)
 		issue, err := issueRepo.FindByID(record.IssueId)
 		if err == nil {
 			if report.EvaluationDecision == domain.EvaluationDecisionAccepted {
 				issue.IssueStatus = domain.IssueStatusAccepted
+				memoryRepo.RecordSuccess(issue.IssueCategory)
 			} else {
 				issue.IssueStatus = domain.IssueStatusRejected
+				memoryRepo.RecordFailure(issue.IssueCategory)
 			}
 			if err := issueRepo.Save(issue); err != nil {
 				return fmt.Errorf("failed to update issue status: %w", err)

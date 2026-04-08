@@ -65,6 +65,38 @@ func TestLoad_MissingConfig(t *testing.T) {
 	}
 }
 
+func TestToExecutionPolicy(t *testing.T) {
+	cfg := &config.Config{
+		Policies: config.Policies{
+			MaxChangedFiles: 10,
+			MaxChangedLines: 300,
+			DenyPaths:       []string{".secret/**"},
+		},
+	}
+
+	p := cfg.ToExecutionPolicy()
+	if p.MaxFiles != 10 {
+		t.Errorf("expected MaxFiles 10, got %d", p.MaxFiles)
+	}
+	if p.MaxLines != 300 {
+		t.Errorf("expected MaxLines 300, got %d", p.MaxLines)
+	}
+	if len(p.DenyPaths) != 1 || p.DenyPaths[0] != ".secret/**" {
+		t.Errorf("unexpected DenyPaths: %v", p.DenyPaths)
+	}
+}
+
+func TestToExecutionPolicy_Defaults(t *testing.T) {
+	cfg := &config.Config{}
+	p := cfg.ToExecutionPolicy()
+	if p.MaxFiles != 5 {
+		t.Errorf("expected default MaxFiles 5, got %d", p.MaxFiles)
+	}
+	if p.MaxLines != 200 {
+		t.Errorf("expected default MaxLines 200, got %d", p.MaxLines)
+	}
+}
+
 func TestDatabasePath(t *testing.T) {
 	path := config.DatabasePath("/project")
 	expected := filepath.Join("/project", ".evoloop", "runtime", "improvement.db")

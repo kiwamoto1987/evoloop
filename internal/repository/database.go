@@ -69,6 +69,14 @@ func migrate(db *sql.DB) error {
 			generated_at DATETIME NOT NULL,
 			FOREIGN KEY (execution_id) REFERENCES execution_records(execution_id)
 		)`,
+		`CREATE TABLE IF NOT EXISTS improvement_memory (
+			memory_id TEXT PRIMARY KEY,
+			pattern_key TEXT NOT NULL UNIQUE,
+			pattern_description TEXT NOT NULL,
+			success_count INTEGER NOT NULL DEFAULT 0,
+			failure_count INTEGER NOT NULL DEFAULT 0,
+			last_observed_at DATETIME NOT NULL
+		)`,
 	}
 
 	for _, stmt := range statements {
