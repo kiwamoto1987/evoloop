@@ -370,3 +370,174 @@ func TestImprovementMemoryRepository_FindAll(t *testing.T) {
 		t.Errorf("expected 2 entries, got %d", len(entries))
 	}
 }
+
+func TestHookExecutionRepository_SaveAndFind(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewHookExecutionRepository(tdb.DB)
+
+	// Need execution record for FK
+	issueRepo := repository.NewImplementationIssueRepository(tdb.DB)
+	execRepo := repository.NewExecutionHistoryRepository(tdb.DB)
+
+	issue := &domain.ImplementationIssue{
+		IssueId: "ISSUE_HOOK1", IssueTitle: "t", IssueDescription: "d",
+		IssueCategory: "test_failure", IssuePriority: 1, IssueStatus: "Open",
+		Source: "analyze", RemediationType: "code_patch", CreatedAt: time.Now(),
+	}
+	if err := issueRepo.Save(issue); err != nil {
+		t.Fatalf("failed to save issue: %v", err)
+	}
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC_HOOK1", IssueId: "ISSUE_HOOK1",
+		ExecutionStatus: "Completed", StartedAt: time.Now(), FinishedAt: time.Now(),
+	}
+	if err := execRepo.Save(record); err != nil {
+		t.Fatalf("failed to save execution: %v", err)
+	}
+
+	hookRecord := &domain.HookExecutionRecord{
+		HookId:      "HOOK001",
+		ExecutionId: "EXEC_HOOK1",
+		HookType:    "post_apply",
+		Command:     "systemctl",
+		Args:        []string{"restart", "trade-bot"},
+		ExitCode:    0,
+		Stdout:      "ok",
+		Stderr:      "",
+		DurationMs:  1500,
+		TimedOut:    false,
+		ExecutedAt:  time.Now().Truncate(time.Second),
+	}
+
+	if err := repo.Save(hookRecord); err != nil {
+		t.Fatalf("failed to save hook record: %v", err)
+	}
+
+	records, err := repo.FindByExecutionID("EXEC_HOOK1")
+	if err != nil {
+		t.Fatalf("failed to find: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(records))
+	}
+	if records[0].Command != "systemctl" {
+		t.Errorf("expected command 'systemctl', got %q", records[0].Command)
+	}
+	if records[0].ExitCode != 0 {
+		t.Errorf("expected exit code 0, got %d", records[0].ExitCode)
+	}
+	if len(records[0].Args) != 2 {
+		t.Errorf("expected 2 args, got %d", len(records[0].Args))
+	}
+}
+
+func TestHookExecutionRepository_FindByExecutionID_Empty(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewHookExecutionRepository(tdb.DB)
+
+	records, err := repo.FindByExecutionID("nonexistent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(records) != 0 {
+		t.Errorf("expected 0 records, got %d", len(records))
+	}
+}
+
+func TestIssueRepository_FindOpenProposable(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewImplementationIssueRepository(tdb.DB)
+
+	issues := []*domain.ImplementationIssue{
+		{IssueId: "I1", IssueTitle: "t1", IssueDescription: "d", IssueCategory: domain.IssueCategoryTestFailure, IssuePriority: 2, IssueStatus: domain.IssueStatusOpen, Source: "analyze", RemediationType: "code_patch", CreatedAt: time.Now()},
+		{IssueId: "I2", IssueTitle: "t2", IssueDescription: "d", IssueCategory: domain.IssueCategoryEnvironment, IssuePriority: 0, IssueStatus: domain.IssueStatusOpen, Source: "analyze", RemediationType: "code_patch", CreatedAt: time.Now()},
+		{IssueId: "I3", IssueTitle: "t3", IssueDescription: "d", IssueCategory: domain.IssueCategoryKPIDegradation, IssuePriority: 1, IssueStatus: domain.IssueStatusOpen, Source: "external", RemediationType: "config_patch", CreatedAt: time.Now()},
+		{IssueId: "I4", IssueTitle: "t4", IssueDescription: "d", IssueCategory: domain.IssueCategoryLintViolation, IssuePriority: 1, IssueStatus: domain.IssueStatusRejected, Source: "analyze", RemediationType: "code_patch", CreatedAt: time.Now()},
+	}
+
+	for _, issue := range issues {
+		if err := repo.Save(issue); err != nil {
+			t.Fatalf("failed to save issue: %v", err)
+		}
+	}
+
+	found, err := repo.FindOpenProposable()
+	if err != nil {
+		t.Fatalf("failed to find: %v", err)
+	}
+
+	// Should return I1 and I3 (Open + proposable), NOT I2 (environment) or I4 (Rejected)
+	if len(found) != 2 {
+		t.Fatalf("expected 2 issues, got %d", len(found))
+	}
+	// Ordered by priority ASC: I3 (pri=1) before I1 (pri=2)
+	if found[0].IssueId != "I3" {
+		t.Errorf("expected first issue I3, got %q", found[0].IssueId)
+	}
+	if found[1].IssueId != "I1" {
+		t.Errorf("expected second issue I1, got %q", found[1].IssueId)
+	}
+}
+
+func TestIssueRepository_FindByDedupKey(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewImplementationIssueRepository(tdb.DB)
+
+	issue := &domain.ImplementationIssue{
+		IssueId: "DEDUP1", IssueTitle: "slippage", IssueDescription: "d",
+		IssueCategory: domain.IssueCategoryKPIDegradation, IssuePriority: 1,
+		IssueStatus: domain.IssueStatusOpen, DedupKey: "kpi:slippage:arb",
+		Source: "external", RemediationType: "config_patch", CreatedAt: time.Now(),
+	}
+	if err := repo.Save(issue); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+
+	found, err := repo.FindByDedupKey("kpi:slippage:arb")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found == nil {
+		t.Fatal("expected to find issue, got nil")
+	}
+	if found.IssueId != "DEDUP1" {
+		t.Errorf("expected issue DEDUP1, got %q", found.IssueId)
+	}
+}
+
+func TestIssueRepository_FindByDedupKey_NotFound(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewImplementationIssueRepository(tdb.DB)
+
+	found, err := repo.FindByDedupKey("nonexistent")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found != nil {
+		t.Errorf("expected nil, got %+v", found)
+	}
+}
+
+func TestIssueRepository_FindByDedupKey_IgnoresNonOpen(t *testing.T) {
+	tdb := setupTestDB(t)
+	repo := repository.NewImplementationIssueRepository(tdb.DB)
+
+	issue := &domain.ImplementationIssue{
+		IssueId: "DEDUP2", IssueTitle: "closed", IssueDescription: "d",
+		IssueCategory: domain.IssueCategoryKPIDegradation, IssuePriority: 1,
+		IssueStatus: domain.IssueStatusCompleted, DedupKey: "kpi:closed",
+		Source: "external", RemediationType: "config_patch", CreatedAt: time.Now(),
+	}
+	if err := repo.Save(issue); err != nil {
+		t.Fatalf("failed to save: %v", err)
+	}
+
+	found, err := repo.FindByDedupKey("kpi:closed")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if found != nil {
+		t.Errorf("expected nil for non-Open issue, got %+v", found)
+	}
+}
