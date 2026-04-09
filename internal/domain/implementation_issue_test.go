@@ -107,19 +107,19 @@ func TestIssueSourceConstants(t *testing.T) {
 func TestNewFieldsExist(t *testing.T) {
 	now := time.Now()
 	issue := &domain.ImplementationIssue{
-		IssueId:            "test-id",
-		IssueTitle:         "test",
-		IssueDescription:   "desc",
-		IssueCategory:      domain.IssueCategoryKPIDegradation,
-		RemediationType:    domain.RemediationTypeConfigPatch,
-		IssuePriority:      1,
-		IssueStatus:        domain.IssueStatusOpen,
-		Source:             domain.IssueSourceExternal,
-		SourceRef:          "rule:slippage",
-		DedupKey:           "kpi:slippage:arb",
-		AttemptCount:       0,
-		LastAttemptedAt:    now,
-		CreatedAt:          now,
+		IssueId:          "test-id",
+		IssueTitle:       "test",
+		IssueDescription: "desc",
+		IssueCategory:    domain.IssueCategoryKPIDegradation,
+		RemediationType:  domain.RemediationTypeConfigPatch,
+		IssuePriority:    1,
+		IssueStatus:      domain.IssueStatusOpen,
+		Source:           domain.IssueSourceExternal,
+		SourceRef:        "rule:slippage",
+		DedupKey:         "kpi:slippage:arb",
+		AttemptCount:     0,
+		LastAttemptedAt:  now,
+		CreatedAt:        now,
 	}
 
 	if issue.RemediationType != domain.RemediationTypeConfigPatch {

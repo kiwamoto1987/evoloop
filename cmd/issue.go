@@ -79,18 +79,18 @@ func runIssueCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	issue := &domain.ImplementationIssue{
-		IssueId:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
-		IssueTitle:      issueTitle,
+		IssueId:          ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		IssueTitle:       issueTitle,
 		IssueDescription: issueDescription,
-		IssueCategory:   issueCategory,
-		RemediationType: issueRemediation,
-		IssuePriority:   issuePriority,
-		IssueStatus:     domain.IssueStatusOpen,
-		Source:          issueSource,
-		SourceRef:       issueSourceRef,
-		DedupKey:        issueDedupKey,
-		AttemptCount:    0,
-		CreatedAt:       time.Now(),
+		IssueCategory:    issueCategory,
+		RemediationType:  issueRemediation,
+		IssuePriority:    issuePriority,
+		IssueStatus:      domain.IssueStatusOpen,
+		Source:           issueSource,
+		SourceRef:        issueSourceRef,
+		DedupKey:         issueDedupKey,
+		AttemptCount:     0,
+		CreatedAt:        time.Now(),
 	}
 
 	if err := issueRepo.Save(issue); err != nil {

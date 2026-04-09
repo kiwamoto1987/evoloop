@@ -261,11 +261,11 @@ issues:
 func TestToExecutionPolicy_WithModeBFields(t *testing.T) {
 	cfg := &config.Config{
 		Policies: config.Policies{
-			MaxChangedFiles:  3,
-			MaxChangedLines:  100,
-			EvaluationMode:   "validate_only",
-			MaxAttempts:      5,
-			CooldownMinutes:  30,
+			MaxChangedFiles: 3,
+			MaxChangedLines: 100,
+			EvaluationMode:  "validate_only",
+			MaxAttempts:     5,
+			CooldownMinutes: 30,
 		},
 	}
 
