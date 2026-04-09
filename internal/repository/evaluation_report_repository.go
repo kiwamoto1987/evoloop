@@ -21,10 +21,11 @@ func NewEvaluationReportRepository(db *sql.DB) *EvaluationReportRepository {
 func (r *EvaluationReportRepository) Save(report *domain.EvaluationReport) error {
 	_, err := r.db.Exec(
 		`INSERT OR REPLACE INTO evaluation_reports
-		(evaluation_id, execution_id, test_passed, lint_passed, typecheck_passed, changed_file_count, changed_line_count, evaluation_decision, failure_reasons, generated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(evaluation_id, execution_id, evaluation_mode, test_status, lint_status, typecheck_status, validate_status, changed_file_count, changed_line_count, evaluation_decision, failure_reasons, generated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		report.EvaluationId, report.ExecutionId,
-		report.TestPassed, report.LintPassed, report.TypeCheckPassed,
+		report.EvaluationMode,
+		report.TestStatus, report.LintStatus, report.TypeCheckStatus, report.ValidateStatus,
 		report.ChangedFileCount, report.ChangedLineCount,
 		report.EvaluationDecision,
 		strings.Join(report.FailureReasons, "|"),
@@ -36,7 +37,7 @@ func (r *EvaluationReportRepository) Save(report *domain.EvaluationReport) error
 // FindAll retrieves all evaluation reports.
 func (r *EvaluationReportRepository) FindAll() ([]*domain.EvaluationReport, error) {
 	rows, err := r.db.Query(
-		`SELECT evaluation_id, execution_id, test_passed, lint_passed, typecheck_passed, changed_file_count, changed_line_count, evaluation_decision, failure_reasons, generated_at
+		`SELECT evaluation_id, execution_id, evaluation_mode, test_status, lint_status, typecheck_status, validate_status, changed_file_count, changed_line_count, evaluation_decision, failure_reasons, generated_at
 		FROM evaluation_reports ORDER BY generated_at DESC`,
 	)
 	if err != nil {
@@ -50,7 +51,8 @@ func (r *EvaluationReportRepository) FindAll() ([]*domain.EvaluationReport, erro
 		var failureReasons string
 		if err := rows.Scan(
 			&report.EvaluationId, &report.ExecutionId,
-			&report.TestPassed, &report.LintPassed, &report.TypeCheckPassed,
+			&report.EvaluationMode,
+			&report.TestStatus, &report.LintStatus, &report.TypeCheckStatus, &report.ValidateStatus,
 			&report.ChangedFileCount, &report.ChangedLineCount,
 			&report.EvaluationDecision, &failureReasons, &report.GeneratedAt,
 		); err != nil {

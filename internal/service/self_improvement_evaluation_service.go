@@ -78,33 +78,42 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 
 	if projectCtx.TestCommand != "" && isToolInstalled(projectCtx.TestCommand) {
 		ok, _ := runCommandInDir(tmpDir, projectCtx.TestCommand)
-		report.TestPassed = ok
-		if !ok {
+		if ok {
+			report.TestStatus = domain.CheckStatusPassed
+		} else {
+			report.TestStatus = domain.CheckStatusFailed
 			failures = append(failures, "tests failed")
 		}
 	} else {
-		report.TestPassed = true
+		report.TestStatus = domain.CheckStatusSkipped
 	}
 
 	if projectCtx.LintCommand != "" && isToolInstalled(projectCtx.LintCommand) {
 		ok, _ := runCommandInDir(tmpDir, projectCtx.LintCommand)
-		report.LintPassed = ok
-		if !ok {
+		if ok {
+			report.LintStatus = domain.CheckStatusPassed
+		} else {
+			report.LintStatus = domain.CheckStatusFailed
 			failures = append(failures, "lint failed")
 		}
 	} else {
-		report.LintPassed = true
+		report.LintStatus = domain.CheckStatusSkipped
 	}
 
 	if projectCtx.TypeCheckCommand != "" && isToolInstalled(projectCtx.TypeCheckCommand) {
 		ok, _ := runCommandInDir(tmpDir, projectCtx.TypeCheckCommand)
-		report.TypeCheckPassed = ok
-		if !ok {
+		if ok {
+			report.TypeCheckStatus = domain.CheckStatusPassed
+		} else {
+			report.TypeCheckStatus = domain.CheckStatusFailed
 			failures = append(failures, "typecheck failed")
 		}
 	} else {
-		report.TypeCheckPassed = true
+		report.TypeCheckStatus = domain.CheckStatusSkipped
 	}
+
+	report.ValidateStatus = domain.CheckStatusSkipped
+	report.EvaluationMode = "sandbox"
 
 	// Check policy constraints
 	if !s.policy.CheckFileCount(fileCount) {

@@ -88,8 +88,8 @@ func TestEvaluate_RejectedByTestFailure(t *testing.T) {
 	if report.EvaluationDecision != domain.EvaluationDecisionRejected {
 		t.Errorf("expected Rejected, got %q", report.EvaluationDecision)
 	}
-	if report.TestPassed {
-		t.Error("expected TestPassed to be false")
+	if report.TestStatus != domain.CheckStatusFailed {
+		t.Errorf("expected TestStatus to be failed, got %q", report.TestStatus)
 	}
 }
 
@@ -217,8 +217,8 @@ func TestEvaluate_SkipsMissingLintTool(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !report.LintPassed {
-		t.Error("expected LintPassed to be true when tool is missing (skipped)")
+	if report.LintStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected LintStatus to be skipped when tool is missing, got %q", report.LintStatus)
 	}
 	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
 		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
@@ -246,8 +246,8 @@ func TestEvaluate_SkipsMissingTestTool(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !report.TestPassed {
-		t.Error("expected TestPassed to be true when tool is missing (skipped)")
+	if report.TestStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected TestStatus to be skipped when tool is missing, got %q", report.TestStatus)
 	}
 	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
 		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
