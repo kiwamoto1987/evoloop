@@ -18,5 +18,5 @@ func OpenTestDatabase() (*TestDB, error) {
 
 // Close closes the test database.
 func (t *TestDB) Close() {
-	t.DB.Close()
+	_ = t.DB.Close()
 }

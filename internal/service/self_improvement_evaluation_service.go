@@ -33,9 +33,11 @@ func NewSelfImprovementEvaluationService(p *policy.ExecutionPolicy) *SelfImprove
 }
 
 // Evaluate runs the evaluation pipeline for a given execution record and project context.
+// validateCommands is used only in validate_only mode; pass nil for sandbox mode.
 func (s *SelfImprovementEvaluationService) Evaluate(
 	record *domain.ExecutionRecord,
 	projectCtx *domain.ProjectContext,
+	validateCommands []string,
 ) (*domain.EvaluationReport, error) {
 	report := &domain.EvaluationReport{
 		EvaluationId: ulid.MustNew(ulid.Now(), rand.Reader).String(),
@@ -54,7 +56,7 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Copy project to temp directory
 	if err := copyProject(projectCtx.ProjectRootPath, tmpDir); err != nil {
@@ -73,37 +75,13 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 	report.ChangedFileCount = fileCount
 	report.ChangedLineCount = lineCount
 
-	// Run quality checks
 	var failures []string
 
-	if projectCtx.TestCommand != "" && isToolInstalled(projectCtx.TestCommand) {
-		ok, _ := runCommandInDir(tmpDir, projectCtx.TestCommand)
-		report.TestPassed = ok
-		if !ok {
-			failures = append(failures, "tests failed")
-		}
-	} else {
-		report.TestPassed = true
-	}
-
-	if projectCtx.LintCommand != "" && isToolInstalled(projectCtx.LintCommand) {
-		ok, _ := runCommandInDir(tmpDir, projectCtx.LintCommand)
-		report.LintPassed = ok
-		if !ok {
-			failures = append(failures, "lint failed")
-		}
-	} else {
-		report.LintPassed = true
-	}
-
-	if projectCtx.TypeCheckCommand != "" && isToolInstalled(projectCtx.TypeCheckCommand) {
-		ok, _ := runCommandInDir(tmpDir, projectCtx.TypeCheckCommand)
-		report.TypeCheckPassed = ok
-		if !ok {
-			failures = append(failures, "typecheck failed")
-		}
-	} else {
-		report.TypeCheckPassed = true
+	switch s.policy.EvaluationMode {
+	case "validate_only":
+		failures = s.evaluateValidateOnly(tmpDir, validateCommands, report)
+	default:
+		failures = s.evaluateSandbox(tmpDir, projectCtx, report)
 	}
 
 	// Check policy constraints
@@ -123,6 +101,95 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 	}
 
 	return report, nil
+}
+
+func (s *SelfImprovementEvaluationService) evaluateSandbox(
+	tmpDir string,
+	projectCtx *domain.ProjectContext,
+	report *domain.EvaluationReport,
+) []string {
+	report.EvaluationMode = "sandbox"
+	var failures []string
+
+	if projectCtx.TestCommand != "" && isToolInstalled(projectCtx.TestCommand) {
+		ok, _ := runCommandInDir(tmpDir, projectCtx.TestCommand)
+		if ok {
+			report.TestStatus = domain.CheckStatusPassed
+		} else {
+			report.TestStatus = domain.CheckStatusFailed
+			failures = append(failures, "tests failed")
+		}
+	} else {
+		report.TestStatus = domain.CheckStatusSkipped
+	}
+
+	if projectCtx.LintCommand != "" && isToolInstalled(projectCtx.LintCommand) {
+		ok, _ := runCommandInDir(tmpDir, projectCtx.LintCommand)
+		if ok {
+			report.LintStatus = domain.CheckStatusPassed
+		} else {
+			report.LintStatus = domain.CheckStatusFailed
+			failures = append(failures, "lint failed")
+		}
+	} else {
+		report.LintStatus = domain.CheckStatusSkipped
+	}
+
+	if projectCtx.TypeCheckCommand != "" && isToolInstalled(projectCtx.TypeCheckCommand) {
+		ok, _ := runCommandInDir(tmpDir, projectCtx.TypeCheckCommand)
+		if ok {
+			report.TypeCheckStatus = domain.CheckStatusPassed
+		} else {
+			report.TypeCheckStatus = domain.CheckStatusFailed
+			failures = append(failures, "typecheck failed")
+		}
+	} else {
+		report.TypeCheckStatus = domain.CheckStatusSkipped
+	}
+
+	report.ValidateStatus = domain.CheckStatusSkipped
+	return failures
+}
+
+func (s *SelfImprovementEvaluationService) evaluateValidateOnly(
+	tmpDir string,
+	validateCommands []string,
+	report *domain.EvaluationReport,
+) []string {
+	report.EvaluationMode = "validate_only"
+	report.TestStatus = domain.CheckStatusSkipped
+	report.LintStatus = domain.CheckStatusSkipped
+	report.TypeCheckStatus = domain.CheckStatusSkipped
+
+	var failures []string
+
+	if len(validateCommands) == 0 {
+		report.ValidateStatus = domain.CheckStatusSkipped
+		return failures
+	}
+
+	allPassed := true
+	for _, cmd := range validateCommands {
+		if cmd == "" {
+			continue
+		}
+		if !isToolInstalled(cmd) {
+			continue
+		}
+		ok, _ := runCommandInDir(tmpDir, cmd)
+		if !ok {
+			allPassed = false
+			failures = append(failures, fmt.Sprintf("validate command failed: %s", cmd))
+		}
+	}
+
+	if allPassed {
+		report.ValidateStatus = domain.CheckStatusPassed
+	} else {
+		report.ValidateStatus = domain.CheckStatusFailed
+	}
+
+	return failures
 }
 
 func copyProject(src, dst string) error {
@@ -165,7 +232,7 @@ func applyPatch(dir, patchContent string) error {
 	if err := os.WriteFile(patchFile, []byte(patchContent), 0644); err != nil {
 		return err
 	}
-	defer os.Remove(patchFile)
+	defer func() { _ = os.Remove(patchFile) }()
 
 	cmd := exec.Command("patch", "-p1", "-i", patchFile)
 	cmd.Dir = dir

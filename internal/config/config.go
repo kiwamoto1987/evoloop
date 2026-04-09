@@ -12,10 +12,12 @@ import (
 
 // Config represents the .evoloop/config.yaml structure.
 type Config struct {
-	ProjectName string     `yaml:"project_name"`
-	LLM         LLMConfig  `yaml:"llm"`
-	Evaluation  EvalConfig `yaml:"evaluation"`
-	Policies    Policies   `yaml:"policies"`
+	ProjectName string      `yaml:"project_name"`
+	LLM         LLMConfig   `yaml:"llm"`
+	Evaluation  EvalConfig  `yaml:"evaluation"`
+	Policies    Policies    `yaml:"policies"`
+	Hooks       HookConfig  `yaml:"hooks"`
+	Issues      IssueConfig `yaml:"issues"`
 }
 
 // LLMConfig holds LLM provider settings.
@@ -27,9 +29,10 @@ type LLMConfig struct {
 
 // EvalConfig holds evaluation command settings.
 type EvalConfig struct {
-	TestCommand      string `yaml:"test_command"`
-	LintCommand      string `yaml:"lint_command"`
-	TypeCheckCommand string `yaml:"typecheck_command"`
+	TestCommand      string   `yaml:"test_command"`
+	LintCommand      string   `yaml:"lint_command"`
+	TypeCheckCommand string   `yaml:"typecheck_command"`
+	ValidateCommands []string `yaml:"validate_commands"`
 }
 
 // Policies holds execution policy settings.
@@ -37,6 +40,29 @@ type Policies struct {
 	MaxChangedFiles int      `yaml:"max_changed_files"`
 	MaxChangedLines int      `yaml:"max_changed_lines"`
 	DenyPaths       []string `yaml:"deny_paths"`
+	EvaluationMode  string   `yaml:"evaluation_mode"`
+	MaxAttempts     int      `yaml:"max_attempts"`
+	CooldownMinutes int      `yaml:"cooldown_minutes"`
+}
+
+// HookConfig holds hook settings.
+type HookConfig struct {
+	PostApply PostApplyHook `yaml:"post_apply"`
+}
+
+// PostApplyHook defines a structured post-apply hook command.
+type PostApplyHook struct {
+	Command    string   `yaml:"command"`
+	Args       []string `yaml:"args"`
+	TimeoutSec int      `yaml:"timeout_sec"`
+	Allowlist  []string `yaml:"allowlist"`
+}
+
+// IssueConfig holds constraints for external issue creation.
+type IssueConfig struct {
+	AllowedCategories    []string `yaml:"allowed_categories"`
+	MaxPriority          int      `yaml:"max_priority"`
+	MaxDescriptionLength int      `yaml:"max_description_length"`
 }
 
 // Load reads config from the given project root.
@@ -79,6 +105,15 @@ func (c *Config) ToExecutionPolicy() *policy.ExecutionPolicy {
 	}
 	if len(c.Policies.DenyPaths) > 0 {
 		p.DenyPaths = c.Policies.DenyPaths
+	}
+	if c.Policies.EvaluationMode != "" {
+		p.EvaluationMode = c.Policies.EvaluationMode
+	}
+	if c.Policies.MaxAttempts > 0 {
+		p.MaxAttempts = c.Policies.MaxAttempts
+	}
+	if c.Policies.CooldownMinutes > 0 {
+		p.CooldownMinutes = c.Policies.CooldownMinutes
 	}
 	return p
 }

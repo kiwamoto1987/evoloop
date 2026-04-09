@@ -160,3 +160,137 @@ func TestDatabasePath(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, path)
 	}
 }
+
+func TestLoad_FullConfigWithModeBFields(t *testing.T) {
+	dir := t.TempDir()
+	configDir := filepath.Join(dir, ".evoloop")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := `project_name: dex-bot
+llm:
+  provider: claude
+  model: sonnet
+  command: "claude"
+evaluation:
+  test_command: "go test ./..."
+  lint_command: "golangci-lint run"
+  typecheck_command: "go build ./..."
+  validate_commands:
+    - "yamllint config.yaml"
+    - "./scripts/validate_config.sh"
+policies:
+  max_changed_files: 5
+  max_changed_lines: 200
+  deny_paths:
+    - ".github/**"
+  evaluation_mode: "validate_only"
+  max_attempts: 5
+  cooldown_minutes: 30
+hooks:
+  post_apply:
+    command: "systemctl"
+    args:
+      - "restart"
+      - "trade-bot"
+    timeout_sec: 30
+    allowlist:
+      - "systemctl"
+issues:
+  allowed_categories:
+    - "kpi_degradation"
+    - "config_tuning"
+  max_priority: 10
+  max_description_length: 5000
+`
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Load(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Validate commands
+	if len(cfg.Evaluation.ValidateCommands) != 2 {
+		t.Errorf("expected 2 validate_commands, got %d", len(cfg.Evaluation.ValidateCommands))
+	}
+	if cfg.Evaluation.ValidateCommands[0] != "yamllint config.yaml" {
+		t.Errorf("expected first validate command 'yamllint config.yaml', got %q", cfg.Evaluation.ValidateCommands[0])
+	}
+
+	// Policies
+	if cfg.Policies.EvaluationMode != "validate_only" {
+		t.Errorf("expected evaluation_mode 'validate_only', got %q", cfg.Policies.EvaluationMode)
+	}
+	if cfg.Policies.MaxAttempts != 5 {
+		t.Errorf("expected max_attempts 5, got %d", cfg.Policies.MaxAttempts)
+	}
+	if cfg.Policies.CooldownMinutes != 30 {
+		t.Errorf("expected cooldown_minutes 30, got %d", cfg.Policies.CooldownMinutes)
+	}
+
+	// Hooks
+	if cfg.Hooks.PostApply.Command != "systemctl" {
+		t.Errorf("expected hook command 'systemctl', got %q", cfg.Hooks.PostApply.Command)
+	}
+	if len(cfg.Hooks.PostApply.Args) != 2 || cfg.Hooks.PostApply.Args[0] != "restart" {
+		t.Errorf("unexpected hook args: %v", cfg.Hooks.PostApply.Args)
+	}
+	if cfg.Hooks.PostApply.TimeoutSec != 30 {
+		t.Errorf("expected hook timeout 30, got %d", cfg.Hooks.PostApply.TimeoutSec)
+	}
+	if len(cfg.Hooks.PostApply.Allowlist) != 1 || cfg.Hooks.PostApply.Allowlist[0] != "systemctl" {
+		t.Errorf("unexpected hook allowlist: %v", cfg.Hooks.PostApply.Allowlist)
+	}
+
+	// Issues
+	if len(cfg.Issues.AllowedCategories) != 2 {
+		t.Errorf("expected 2 allowed categories, got %d", len(cfg.Issues.AllowedCategories))
+	}
+	if cfg.Issues.MaxPriority != 10 {
+		t.Errorf("expected max_priority 10, got %d", cfg.Issues.MaxPriority)
+	}
+	if cfg.Issues.MaxDescriptionLength != 5000 {
+		t.Errorf("expected max_description_length 5000, got %d", cfg.Issues.MaxDescriptionLength)
+	}
+}
+
+func TestToExecutionPolicy_WithModeBFields(t *testing.T) {
+	cfg := &config.Config{
+		Policies: config.Policies{
+			MaxChangedFiles: 3,
+			MaxChangedLines: 100,
+			EvaluationMode:  "validate_only",
+			MaxAttempts:     5,
+			CooldownMinutes: 30,
+		},
+	}
+
+	p := cfg.ToExecutionPolicy()
+	if p.EvaluationMode != "validate_only" {
+		t.Errorf("expected EvaluationMode 'validate_only', got %q", p.EvaluationMode)
+	}
+	if p.MaxAttempts != 5 {
+		t.Errorf("expected MaxAttempts 5, got %d", p.MaxAttempts)
+	}
+	if p.CooldownMinutes != 30 {
+		t.Errorf("expected CooldownMinutes 30, got %d", p.CooldownMinutes)
+	}
+}
+
+func TestToExecutionPolicy_DefaultsForNewFields(t *testing.T) {
+	cfg := &config.Config{}
+	p := cfg.ToExecutionPolicy()
+	if p.EvaluationMode != "sandbox" {
+		t.Errorf("expected default EvaluationMode 'sandbox', got %q", p.EvaluationMode)
+	}
+	if p.MaxAttempts != 3 {
+		t.Errorf("expected default MaxAttempts 3, got %d", p.MaxAttempts)
+	}
+	if p.CooldownMinutes != 60 {
+		t.Errorf("expected default CooldownMinutes 60, got %d", p.CooldownMinutes)
+	}
+}

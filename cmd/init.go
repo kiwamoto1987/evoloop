@@ -19,6 +19,7 @@ evaluation:
   test_command: "go test ./..."
   lint_command: "golangci-lint run"
   typecheck_command: "go build ./..."
+  # validate_commands: []  # For validate_only mode
 
 policies:
   max_changed_files: 5
@@ -26,6 +27,26 @@ policies:
   deny_paths:
     - ".github/**"
     - ".evoloop/**"
+  evaluation_mode: "sandbox"  # sandbox | validate_only
+  max_attempts: 3
+  cooldown_minutes: 60
+
+# hooks:
+#   post_apply:
+#     command: "systemctl"
+#     args: ["restart", "my-service"]
+#     timeout_sec: 30
+#     allowlist: ["systemctl"]
+
+# issues:
+#   allowed_categories:
+#     - "test_failure"
+#     - "lint_violation"
+#     - "typecheck_failure"
+#     - "kpi_degradation"
+#     - "config_tuning"
+#   max_priority: 10
+#   max_description_length: 5000
 `
 
 // RunInit executes the init logic. Exported for testing.

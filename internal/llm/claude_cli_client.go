@@ -82,24 +82,24 @@ func buildPrompt(input *domain.PromptContext) string {
 	var b strings.Builder
 
 	b.WriteString("Fix the following issue in this project.\n\n")
-	b.WriteString(fmt.Sprintf("Issue: %s\n", input.IssueTitle))
-	b.WriteString(fmt.Sprintf("Description: %s\n", input.IssueDescription))
+	fmt.Fprintf(&b, "Issue: %s\n", input.IssueTitle)
+	fmt.Fprintf(&b, "Description: %s\n", input.IssueDescription)
 
 	if len(input.AcceptanceCriteria) > 0 {
 		b.WriteString("\nAcceptance Criteria:\n")
 		for _, ac := range input.AcceptanceCriteria {
-			b.WriteString(fmt.Sprintf("- %s\n", ac))
+			fmt.Fprintf(&b, "- %s\n", ac)
 		}
 	}
 
 	if len(input.TargetPaths) > 0 {
-		b.WriteString(fmt.Sprintf("\nTarget paths: %s\n", strings.Join(input.TargetPaths, ", ")))
+		fmt.Fprintf(&b, "\nTarget paths: %s\n", strings.Join(input.TargetPaths, ", "))
 	}
 
 	if len(input.RelevantFileContents) > 0 {
 		b.WriteString("\nRelevant files:\n")
 		for path, content := range input.RelevantFileContents {
-			b.WriteString(fmt.Sprintf("\n--- %s ---\n%s\n", path, content))
+			fmt.Fprintf(&b, "\n--- %s ---\n%s\n", path, content)
 		}
 	}
 

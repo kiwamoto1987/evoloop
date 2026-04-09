@@ -56,7 +56,7 @@ func (r *ImprovementMemoryRepository) FindAll() ([]*domain.ImprovementMemoryEntr
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var entries []*domain.ImprovementMemoryEntry
 	for rows.Next() {

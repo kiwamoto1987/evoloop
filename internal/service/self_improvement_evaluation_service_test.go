@@ -50,7 +50,7 @@ func TestEvaluate_Accepted(t *testing.T) {
 	}
 
 	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
-	report, err := svc.Evaluate(record, projectCtx)
+	report, err := svc.Evaluate(record, projectCtx, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestEvaluate_RejectedByTestFailure(t *testing.T) {
 	}
 
 	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
-	report, err := svc.Evaluate(record, projectCtx)
+	report, err := svc.Evaluate(record, projectCtx, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -88,8 +88,8 @@ func TestEvaluate_RejectedByTestFailure(t *testing.T) {
 	if report.EvaluationDecision != domain.EvaluationDecisionRejected {
 		t.Errorf("expected Rejected, got %q", report.EvaluationDecision)
 	}
-	if report.TestPassed {
-		t.Error("expected TestPassed to be false")
+	if report.TestStatus != domain.CheckStatusFailed {
+		t.Errorf("expected TestStatus to be failed, got %q", report.TestStatus)
 	}
 }
 
@@ -112,7 +112,7 @@ func TestEvaluate_RejectedByPolicy(t *testing.T) {
 	}
 
 	svc := service.NewSelfImprovementEvaluationService(restrictivePolicy)
-	report, err := svc.Evaluate(record, projectCtx)
+	report, err := svc.Evaluate(record, projectCtx, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestEvaluate_InvalidPatchPath(t *testing.T) {
 	}
 
 	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
-	_, err := svc.Evaluate(record, projectCtx)
+	_, err := svc.Evaluate(record, projectCtx, nil)
 	if err == nil {
 		t.Fatal("expected error for invalid patch path")
 	}
@@ -185,7 +185,7 @@ func TestEvaluate_CopyExcludesPatterns(t *testing.T) {
 	}
 
 	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
-	report, err := svc.Evaluate(record, projectCtx)
+	report, err := svc.Evaluate(record, projectCtx, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -212,13 +212,13 @@ func TestEvaluate_SkipsMissingLintTool(t *testing.T) {
 	}
 
 	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
-	report, err := svc.Evaluate(record, projectCtx)
+	report, err := svc.Evaluate(record, projectCtx, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !report.LintPassed {
-		t.Error("expected LintPassed to be true when tool is missing (skipped)")
+	if report.LintStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected LintStatus to be skipped when tool is missing, got %q", report.LintStatus)
 	}
 	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
 		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
@@ -241,15 +241,152 @@ func TestEvaluate_SkipsMissingTestTool(t *testing.T) {
 	}
 
 	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
-	report, err := svc.Evaluate(record, projectCtx)
+	report, err := svc.Evaluate(record, projectCtx, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !report.TestPassed {
-		t.Error("expected TestPassed to be true when tool is missing (skipped)")
+	if report.TestStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected TestStatus to be skipped when tool is missing, got %q", report.TestStatus)
 	}
 	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
 		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
+	}
+}
+
+func TestEvaluate_ValidateOnlyMode_Accepted(t *testing.T) {
+	projectDir, patchPath := setupEvalProject(t)
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC_VO1",
+		PatchPath:   patchPath,
+	}
+
+	projectCtx := &domain.ProjectContext{
+		ProjectRootPath: projectDir,
+		TestCommand:     "false", // would fail in sandbox mode
+	}
+
+	p := &policy.ExecutionPolicy{
+		MaxFiles:       5,
+		MaxLines:       200,
+		EvaluationMode: "validate_only",
+	}
+
+	svc := service.NewSelfImprovementEvaluationService(p)
+	report, err := svc.Evaluate(record, projectCtx, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if report.EvaluationMode != "validate_only" {
+		t.Errorf("expected EvaluationMode 'validate_only', got %q", report.EvaluationMode)
+	}
+	if report.TestStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected TestStatus skipped in validate_only, got %q", report.TestStatus)
+	}
+	if report.LintStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected LintStatus skipped in validate_only, got %q", report.LintStatus)
+	}
+	if report.TypeCheckStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected TypeCheckStatus skipped in validate_only, got %q", report.TypeCheckStatus)
+	}
+	// No validate_commands configured → ValidateStatus = skipped → Accepted
+	if report.ValidateStatus != domain.CheckStatusSkipped {
+		t.Errorf("expected ValidateStatus skipped (no commands), got %q", report.ValidateStatus)
+	}
+	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
+		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
+	}
+}
+
+func TestEvaluate_ValidateOnlyMode_WithValidateCommands(t *testing.T) {
+	projectDir, patchPath := setupEvalProject(t)
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC_VO2",
+		PatchPath:   patchPath,
+	}
+
+	projectCtx := &domain.ProjectContext{
+		ProjectRootPath: projectDir,
+	}
+
+	p := &policy.ExecutionPolicy{
+		MaxFiles:       5,
+		MaxLines:       200,
+		EvaluationMode: "validate_only",
+	}
+
+	validateCommands := []string{"true"} // always succeeds
+
+	svc := service.NewSelfImprovementEvaluationService(p)
+	report, err := svc.Evaluate(record, projectCtx, validateCommands)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if report.ValidateStatus != domain.CheckStatusPassed {
+		t.Errorf("expected ValidateStatus passed, got %q", report.ValidateStatus)
+	}
+	if report.EvaluationDecision != domain.EvaluationDecisionAccepted {
+		t.Errorf("expected Accepted, got %q (reasons: %v)", report.EvaluationDecision, report.FailureReasons)
+	}
+}
+
+func TestEvaluate_ValidateOnlyMode_FailingValidateCommand(t *testing.T) {
+	projectDir, patchPath := setupEvalProject(t)
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC_VO3",
+		PatchPath:   patchPath,
+	}
+
+	projectCtx := &domain.ProjectContext{
+		ProjectRootPath: projectDir,
+	}
+
+	p := &policy.ExecutionPolicy{
+		MaxFiles:       5,
+		MaxLines:       200,
+		EvaluationMode: "validate_only",
+	}
+
+	validateCommands := []string{"false"} // always fails
+
+	svc := service.NewSelfImprovementEvaluationService(p)
+	report, err := svc.Evaluate(record, projectCtx, validateCommands)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if report.ValidateStatus != domain.CheckStatusFailed {
+		t.Errorf("expected ValidateStatus failed, got %q", report.ValidateStatus)
+	}
+	if report.EvaluationDecision != domain.EvaluationDecisionRejected {
+		t.Errorf("expected Rejected, got %q", report.EvaluationDecision)
+	}
+}
+
+func TestEvaluate_SandboxMode_SetsEvaluationMode(t *testing.T) {
+	projectDir, patchPath := setupEvalProject(t)
+
+	record := &domain.ExecutionRecord{
+		ExecutionId: "EXEC_SM1",
+		PatchPath:   patchPath,
+	}
+
+	projectCtx := &domain.ProjectContext{
+		ProjectRootPath: projectDir,
+	}
+
+	svc := service.NewSelfImprovementEvaluationService(policy.DefaultPolicy())
+	report, err := svc.Evaluate(record, projectCtx, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if report.EvaluationMode != "sandbox" {
+		t.Errorf("expected EvaluationMode 'sandbox', got %q", report.EvaluationMode)
 	}
 }
