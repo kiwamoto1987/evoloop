@@ -124,7 +124,7 @@ var runCmd = &cobra.Command{
 			// Step 4: Evaluate
 			fmt.Println("[evaluate] Evaluating patch...")
 			evalSvc := service.NewSelfImprovementEvaluationService(cfg.ToExecutionPolicy())
-			report, err := evalSvc.Evaluate(record, projectCtx)
+			report, err := evalSvc.Evaluate(record, projectCtx, cfg.Evaluation.ValidateCommands)
 			if err != nil {
 				fmt.Printf("[evaluate] Error: %v\n", err)
 				consecutiveFailures++

@@ -57,7 +57,7 @@ var evaluateCmd = &cobra.Command{
 
 		// Run evaluation
 		svc := service.NewSelfImprovementEvaluationService(cfg.ToExecutionPolicy())
-		report, err := svc.Evaluate(record, projectCtx)
+		report, err := svc.Evaluate(record, projectCtx, cfg.Evaluation.ValidateCommands)
 		if err != nil {
 			return err
 		}

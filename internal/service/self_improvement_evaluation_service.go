@@ -33,9 +33,11 @@ func NewSelfImprovementEvaluationService(p *policy.ExecutionPolicy) *SelfImprove
 }
 
 // Evaluate runs the evaluation pipeline for a given execution record and project context.
+// validateCommands is used only in validate_only mode; pass nil for sandbox mode.
 func (s *SelfImprovementEvaluationService) Evaluate(
 	record *domain.ExecutionRecord,
 	projectCtx *domain.ProjectContext,
+	validateCommands []string,
 ) (*domain.EvaluationReport, error) {
 	report := &domain.EvaluationReport{
 		EvaluationId: ulid.MustNew(ulid.Now(), rand.Reader).String(),
@@ -73,7 +75,40 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 	report.ChangedFileCount = fileCount
 	report.ChangedLineCount = lineCount
 
-	// Run quality checks
+	var failures []string
+
+	switch s.policy.EvaluationMode {
+	case "validate_only":
+		failures = s.evaluateValidateOnly(tmpDir, validateCommands, report)
+	default:
+		failures = s.evaluateSandbox(tmpDir, projectCtx, report)
+	}
+
+	// Check policy constraints
+	if !s.policy.CheckFileCount(fileCount) {
+		failures = append(failures, fmt.Sprintf("changed files %d exceeds limit %d", fileCount, s.policy.MaxFiles))
+	}
+	if !s.policy.CheckLineCount(lineCount) {
+		failures = append(failures, fmt.Sprintf("changed lines %d exceeds limit %d", lineCount, s.policy.MaxLines))
+	}
+
+	// Decide
+	if len(failures) == 0 {
+		report.EvaluationDecision = domain.EvaluationDecisionAccepted
+	} else {
+		report.EvaluationDecision = domain.EvaluationDecisionRejected
+		report.FailureReasons = failures
+	}
+
+	return report, nil
+}
+
+func (s *SelfImprovementEvaluationService) evaluateSandbox(
+	tmpDir string,
+	projectCtx *domain.ProjectContext,
+	report *domain.EvaluationReport,
+) []string {
+	report.EvaluationMode = "sandbox"
 	var failures []string
 
 	if projectCtx.TestCommand != "" && isToolInstalled(projectCtx.TestCommand) {
@@ -113,25 +148,48 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 	}
 
 	report.ValidateStatus = domain.CheckStatusSkipped
-	report.EvaluationMode = "sandbox"
+	return failures
+}
 
-	// Check policy constraints
-	if !s.policy.CheckFileCount(fileCount) {
-		failures = append(failures, fmt.Sprintf("changed files %d exceeds limit %d", fileCount, s.policy.MaxFiles))
-	}
-	if !s.policy.CheckLineCount(lineCount) {
-		failures = append(failures, fmt.Sprintf("changed lines %d exceeds limit %d", lineCount, s.policy.MaxLines))
+func (s *SelfImprovementEvaluationService) evaluateValidateOnly(
+	tmpDir string,
+	validateCommands []string,
+	report *domain.EvaluationReport,
+) []string {
+	report.EvaluationMode = "validate_only"
+	report.TestStatus = domain.CheckStatusSkipped
+	report.LintStatus = domain.CheckStatusSkipped
+	report.TypeCheckStatus = domain.CheckStatusSkipped
+
+	var failures []string
+
+	if len(validateCommands) == 0 {
+		report.ValidateStatus = domain.CheckStatusSkipped
+		return failures
 	}
 
-	// Decide
-	if len(failures) == 0 {
-		report.EvaluationDecision = domain.EvaluationDecisionAccepted
+	allPassed := true
+	for _, cmd := range validateCommands {
+		if cmd == "" {
+			continue
+		}
+		if !isToolInstalled(cmd) {
+			continue
+		}
+		ok, _ := runCommandInDir(tmpDir, cmd)
+		if !ok {
+			allPassed = false
+			failures = append(failures, fmt.Sprintf("validate command failed: %s", cmd))
+		}
+	}
+
+	if allPassed {
+		report.ValidateStatus = domain.CheckStatusPassed
 	} else {
-		report.EvaluationDecision = domain.EvaluationDecisionRejected
-		report.FailureReasons = failures
+		report.ValidateStatus = domain.CheckStatusFailed
 	}
 
-	return report, nil
+	return failures
 }
 
 func copyProject(src, dst string) error {
