@@ -57,7 +57,7 @@ func runIssueCreate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	issueRepo := repository.NewImplementationIssueRepository(db)
 	memoryRepo := repository.NewImprovementMemoryRepository(db)

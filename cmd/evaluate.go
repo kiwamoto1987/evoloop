@@ -46,7 +46,7 @@ var evaluateCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open database: %w", err)
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		// Load execution record from DB
 		execRepo := repository.NewExecutionHistoryRepository(db)

@@ -43,7 +43,7 @@ func (r *EvaluationReportRepository) FindAll() ([]*domain.EvaluationReport, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var reports []*domain.EvaluationReport
 	for rows.Next() {

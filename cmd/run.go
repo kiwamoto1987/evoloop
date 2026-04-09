@@ -42,7 +42,7 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open database: %w", err)
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		issueRepo := repository.NewImplementationIssueRepository(db)
 		execRepo := repository.NewExecutionHistoryRepository(db)

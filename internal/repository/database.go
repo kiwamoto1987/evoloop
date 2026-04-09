@@ -24,7 +24,7 @@ func OpenDatabase(dbPath string) (*sql.DB, error) {
 	}
 
 	if err := migrate(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 

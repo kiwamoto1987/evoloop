@@ -59,7 +59,7 @@ func (r *ExecutionHistoryRepository) FindAll() ([]*domain.ExecutionRecord, error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var records []*domain.ExecutionRecord
 	for rows.Next() {

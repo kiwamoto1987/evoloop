@@ -43,8 +43,10 @@ issues:
 func TestIssueCreate_Success(t *testing.T) {
 	dir := setupIssueTestProject(t)
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	err := cmd.ExecuteArgs([]string{
 		"issue", "create",
@@ -65,7 +67,7 @@ func TestIssueCreate_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := repository.NewImplementationIssueRepository(db)
 	issues, err := repo.FindAll()
@@ -89,8 +91,10 @@ func TestIssueCreate_Success(t *testing.T) {
 func TestIssueCreate_EmptyTitle(t *testing.T) {
 	dir := setupIssueTestProject(t)
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	err := cmd.ExecuteArgs([]string{
 		"issue", "create",
@@ -106,8 +110,10 @@ func TestIssueCreate_EmptyTitle(t *testing.T) {
 func TestIssueCreate_InvalidCategory(t *testing.T) {
 	dir := setupIssueTestProject(t)
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	err := cmd.ExecuteArgs([]string{
 		"issue", "create",
@@ -123,8 +129,10 @@ func TestIssueCreate_InvalidCategory(t *testing.T) {
 func TestIssueCreate_InvalidPriority(t *testing.T) {
 	dir := setupIssueTestProject(t)
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	err := cmd.ExecuteArgs([]string{
 		"issue", "create",
@@ -141,8 +149,10 @@ func TestIssueCreate_InvalidPriority(t *testing.T) {
 func TestIssueCreate_Dedup_CreatesThenUpdates(t *testing.T) {
 	dir := setupIssueTestProject(t)
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	// First create
 	err := cmd.ExecuteArgs([]string{
@@ -175,7 +185,7 @@ func TestIssueCreate_Dedup_CreatesThenUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open db: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	repo := repository.NewImplementationIssueRepository(db)
 	issues, err := repo.FindAll()
@@ -196,8 +206,10 @@ func TestIssueCreate_Dedup_CreatesThenUpdates(t *testing.T) {
 func TestIssueCreate_InvalidRemediation(t *testing.T) {
 	dir := setupIssueTestProject(t)
 	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	err := cmd.ExecuteArgs([]string{
 		"issue", "create",

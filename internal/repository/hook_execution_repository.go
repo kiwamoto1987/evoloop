@@ -48,7 +48,7 @@ func (r *HookExecutionRepository) FindByExecutionID(executionID string) ([]*doma
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var records []*domain.HookExecutionRecord
 	for rows.Next() {

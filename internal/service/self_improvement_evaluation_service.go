@@ -56,7 +56,7 @@ func (s *SelfImprovementEvaluationService) Evaluate(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Copy project to temp directory
 	if err := copyProject(projectCtx.ProjectRootPath, tmpDir); err != nil {
@@ -232,7 +232,7 @@ func applyPatch(dir, patchContent string) error {
 	if err := os.WriteFile(patchFile, []byte(patchContent), 0644); err != nil {
 		return err
 	}
-	defer os.Remove(patchFile)
+	defer func() { _ = os.Remove(patchFile) }()
 
 	cmd := exec.Command("patch", "-p1", "-i", patchFile)
 	cmd.Dir = dir

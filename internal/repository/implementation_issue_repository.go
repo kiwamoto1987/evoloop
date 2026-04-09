@@ -60,7 +60,7 @@ func (r *ImplementationIssueRepository) FindAll() ([]*domain.ImplementationIssue
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanIssues(rows)
 }
@@ -77,7 +77,7 @@ func (r *ImplementationIssueRepository) FindOpenProposable() ([]*domain.Implemen
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	return scanIssues(rows)
 }
